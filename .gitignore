@@ -72,11 +72,13 @@ ENV/
 .ruff_cache/
 .coverage
 htmlcov/
+*.egg-info/
 
 # TypeScript
 *.tsbuildinfo
 
 # Local tool state
+.agents/exps/
 .codex/
 .claude/
 .cursor/

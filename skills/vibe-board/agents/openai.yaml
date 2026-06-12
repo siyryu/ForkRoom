@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vibe Board"
+  short_description: "Manage agent worktree experiment workflows"
+  default_prompt: "Use $vibe-board to create or merge-review a worktree-backed coding experiment."

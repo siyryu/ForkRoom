@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "links": [
+    {
+      "source": ".env.local",
+      "target": ".env.local",
+      "required": true,
+      "description": "Local app environment"
+    }
+  ]
+}
