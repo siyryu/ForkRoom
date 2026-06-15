@@ -9,6 +9,8 @@ pip install -e .
 vibe-board
 ```
 
+The dashboard refreshes automatically every two seconds. Press `r` to refresh on demand.
+
 Or point it at a repository:
 
 ```bash

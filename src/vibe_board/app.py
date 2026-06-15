@@ -13,6 +13,8 @@ from .scanner import scan_repository
 class VibeBoardApp(App):
     """Read-only dashboard for worktree-backed experiments."""
 
+    AUTO_REFRESH_SECONDS = 2.0
+
     CSS = """
     Screen {
         layout: vertical;
@@ -61,6 +63,7 @@ class VibeBoardApp(App):
         self.root = root
         self.snapshot: Optional[Snapshot] = None
         self.selected_exp_id: Optional[str] = None
+        self.refresh_worker = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -78,10 +81,13 @@ class VibeBoardApp(App):
         experiments.add_columns("ID", "Title", "Status", "Branch", "Updated")
         links = self.query_one("#links", DataTable)
         links.add_columns("Source", "Target", "Required", "Status", "Description")
+        self.set_interval(self.AUTO_REFRESH_SECONDS, self.action_refresh, name="auto-refresh")
         self.action_refresh()
 
     def action_refresh(self) -> None:
-        self.run_worker(self.refresh_snapshot(), name="refresh", group="scan", exclusive=True)
+        if self.refresh_worker is not None and not self.refresh_worker.is_finished:
+            return
+        self.refresh_worker = self.run_worker(self.refresh_snapshot(), name="refresh", group="scan", exclusive=True)
 
     async def refresh_snapshot(self) -> None:
         snapshot = await asyncio.to_thread(scan_repository, self.root)
