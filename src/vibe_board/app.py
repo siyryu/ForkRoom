@@ -4,6 +4,8 @@ import webbrowser
 from pathlib import Path
 from typing import Callable, Dict, Mapping, Optional, Sequence
 
+from rich.padding import Padding
+from rich.spinner import Spinner
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Footer, Header, Static
@@ -21,6 +23,7 @@ class VibeBoardApp(App):
 
     AUTO_REFRESH_SECONDS = 2.0
     CODEX_RUN_REFRESH_SECONDS = 10.0
+    ACTIVE_EXPERIMENT_RUN_STATES = {"active", "waiting"}
 
     CSS = """
     Screen {
@@ -87,6 +90,7 @@ class VibeBoardApp(App):
         self.selected_session_id: Optional[str] = None
         self.session_run_states: Dict[str, str] = {}
         self.session_run_ids: Sequence[str] = ()
+        self.experiment_run_spinners: Dict[str, Spinner] = {}
         self.last_session_run_refresh = 0.0
         self.refresh_worker = None
 
@@ -107,12 +111,17 @@ class VibeBoardApp(App):
 
     def on_mount(self) -> None:
         experiments = self.query_one("#experiments", DataTable)
-        experiments.add_columns("ID", "Title", "Branch", "Updated")
+        experiments.add_column("", width=4, key="run")
+        experiments.add_column("ID", key="id")
+        experiments.add_column("Title", key="title")
+        experiments.add_column("Branch", key="branch")
+        experiments.add_column("Updated", key="updated")
         sessions = self.query_one("#sessions", DataTable)
         sessions.add_columns("ID", "Title", "Run", "Updated")
         links = self.query_one("#links", DataTable)
         links.add_columns("Source", "Target", "Required", "Message", "Description")
         self.set_interval(self.AUTO_REFRESH_SECONDS, self.action_refresh, name="auto-refresh")
+        self.set_interval(0.25, self.render_experiment_run_indicators, name="run-indicator-animation")
         self.action_refresh()
         experiments.focus()
 
@@ -135,8 +144,10 @@ class VibeBoardApp(App):
         if not session_ids:
             self.session_run_states = {}
             self.session_run_ids = ()
+            self.render_experiment_run_indicators()
             return
         if not self.should_refresh_session_run_states(session_ids):
+            self.render_experiment_run_indicators()
             return
 
         try:
@@ -148,6 +159,7 @@ class VibeBoardApp(App):
         }
         self.session_run_ids = session_ids
         self.last_session_run_refresh = time.monotonic()
+        self.render_experiment_run_indicators()
 
     def should_refresh_session_run_states(self, session_ids: Sequence[str]) -> bool:
         if tuple(session_ids) != tuple(self.session_run_ids):
@@ -186,9 +198,16 @@ class VibeBoardApp(App):
 
         table = self.query_one("#experiments", DataTable)
         table.clear()
+        experiment_ids = {experiment.id for experiment in self.snapshot.experiments}
+        self.experiment_run_spinners = {
+            exp_id: spinner
+            for exp_id, spinner in self.experiment_run_spinners.items()
+            if exp_id in experiment_ids
+        }
         selected_row = 0
         for index, experiment in enumerate(self.snapshot.experiments):
             table.add_row(
+                self.experiment_run_indicator(experiment),
                 experiment.id,
                 experiment.title,
                 experiment.branch,
@@ -200,6 +219,19 @@ class VibeBoardApp(App):
         if self.snapshot.experiments:
             table.move_cursor(row=selected_row, column=0, animate=False)
         self.render_selection()
+
+    def render_experiment_run_indicators(self) -> None:
+        if self.snapshot is None:
+            return
+
+        table = self.query_one("#experiments", DataTable)
+        for experiment in self.snapshot.experiments:
+            table.update_cell(
+                experiment.id,
+                "run",
+                self.experiment_run_indicator(experiment),
+                update_width=False,
+            )
 
     def render_selection(self) -> None:
         if self.snapshot is None:
@@ -277,6 +309,20 @@ class VibeBoardApp(App):
 
     def session_run_state(self, session: AgentSession) -> str:
         return self.session_run_states.get(session.id, UNKNOWN_RUN_STATE)
+
+    def experiment_has_active_run(self, experiment: Experiment) -> bool:
+        return any(
+            self.session_run_state(session) in self.ACTIVE_EXPERIMENT_RUN_STATES
+            for session in experiment.sessions
+        )
+
+    def experiment_run_indicator(self, experiment: Experiment) -> object:
+        if not self.experiment_has_active_run(experiment):
+            self.experiment_run_spinners.pop(experiment.id, None)
+            return ""
+        if experiment.id not in self.experiment_run_spinners:
+            self.experiment_run_spinners[experiment.id] = Spinner("dots", style="bold green")
+        return Padding(self.experiment_run_spinners[experiment.id], (0, 0, 0, 1))
 
     def focus_sessions(self) -> None:
         experiment = self.selected_experiment()

@@ -14,7 +14,7 @@ Move the experiment cursor to inspect its details, symlink status, and recorded 
 Press `Enter` on an experiment to focus its sessions, then press `Enter` on a session to open its Codex deep link.
 Press `Esc` to return focus to the experiments table.
 
-The sessions table includes a `Run` column when Codex runtime state is available. Vibe Board queries the local Codex App Server and falls back to `unknown` if Codex is unavailable, times out, or cannot read a thread.
+The experiments table shows an animated indicator next to any experiment with a recorded session that is active or waiting on approval. The sessions table shows the specific `Run` state for each recorded Codex thread. Vibe Board queries the local Codex App Server and falls back to `unknown` if Codex is unavailable, times out, or cannot read a thread.
 
 Vibe Board resolves `codex` from `PATH`, then falls back to the macOS Codex.app bundle. Set `VIBE_BOARD_CODEX_BIN` to override the executable path.
 
