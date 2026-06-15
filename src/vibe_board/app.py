@@ -25,26 +25,27 @@ class VibeBoardApp(App):
     }
 
     #experiments-panel {
-        width: 58;
-        min-width: 42;
-        height: 100%;
+        width: 100%;
+        height: 1fr;
         border: solid $accent;
     }
 
-    #right-panel {
-        width: 1fr;
-        height: 100%;
+    #lower-panels {
+        width: 100%;
+        height: 1fr;
     }
 
     #details {
-        height: 2fr;
+        width: 1fr;
+        height: 100%;
         border: solid $accent;
         padding: 1 2;
         overflow-y: auto;
     }
 
     #links {
-        height: 1fr;
+        width: 1fr;
+        height: 100%;
         border: solid $accent;
     }
 
@@ -67,11 +68,11 @@ class VibeBoardApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        with Horizontal(id="body"):
+        with Vertical(id="body"):
             with Vertical(id="experiments-panel"):
                 yield Static("Experiments", id="experiments-title")
-                yield DataTable(id="experiments")
-            with Vertical(id="right-panel"):
+                yield DataTable(id="experiments", cursor_type="row")
+            with Horizontal(id="lower-panels"):
                 yield Static("Loading repository state...", id="details")
                 yield DataTable(id="links")
         yield Footer()
