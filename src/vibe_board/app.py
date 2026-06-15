@@ -1,20 +1,25 @@
 import asyncio
+import time
 import webbrowser
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Dict, Mapping, Optional, Sequence
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Footer, Header, Static
 
+from .codex_status import UNKNOWN_RUN_STATE, load_codex_run_states
 from .models import AgentSession, Experiment, Snapshot
 from .scanner import scan_repository
+
+SessionRunLoader = Callable[[Sequence[str]], Mapping[str, str]]
 
 
 class VibeBoardApp(App):
     """Read-only dashboard for worktree-backed experiments."""
 
     AUTO_REFRESH_SECONDS = 2.0
+    CODEX_RUN_REFRESH_SECONDS = 10.0
 
     CSS = """
     Screen {
@@ -36,23 +41,28 @@ class VibeBoardApp(App):
         height: 1fr;
     }
 
-    #details {
+    #details-panel {
         width: 2fr;
         height: 100%;
+    }
+
+    #details {
+        width: 100%;
+        height: 1fr;
         border: solid $accent;
         padding: 1 2;
         overflow-y: auto;
     }
 
     #sessions-panel {
-        width: 1fr;
+        width: 3fr;
         height: 100%;
         border: solid $accent;
     }
 
     #links {
-        width: 2fr;
-        height: 100%;
+        width: 100%;
+        height: 8;
         border: solid $accent;
     }
 
@@ -67,12 +77,16 @@ class VibeBoardApp(App):
         ("q", "quit", "Quit"),
     ]
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, session_run_loader: Optional[SessionRunLoader] = None) -> None:
         super().__init__()
         self.root = root
+        self.session_run_loader = session_run_loader or load_codex_run_states
         self.snapshot: Optional[Snapshot] = None
         self.selected_exp_id: Optional[str] = None
         self.selected_session_id: Optional[str] = None
+        self.session_run_states: Dict[str, str] = {}
+        self.session_run_ids: Sequence[str] = ()
+        self.last_session_run_refresh = 0.0
         self.refresh_worker = None
 
     def compose(self) -> ComposeResult:
@@ -82,20 +96,21 @@ class VibeBoardApp(App):
                 yield Static("Experiments", id="experiments-title")
                 yield DataTable(id="experiments", cursor_type="row")
             with Horizontal(id="lower-panels"):
-                yield Static("Loading repository state...", id="details")
+                with Vertical(id="details-panel"):
+                    yield Static("Loading repository state...", id="details")
+                    yield DataTable(id="links")
                 with Vertical(id="sessions-panel"):
                     yield Static("Sessions (0)", id="sessions-title")
                     yield DataTable(id="sessions", cursor_type="row")
-                yield DataTable(id="links")
         yield Footer()
 
     def on_mount(self) -> None:
         experiments = self.query_one("#experiments", DataTable)
-        experiments.add_columns("ID", "Title", "Status", "Branch", "Updated")
+        experiments.add_columns("ID", "Title", "Branch", "Updated")
         sessions = self.query_one("#sessions", DataTable)
-        sessions.add_columns("ID", "Title", "Status", "Updated")
+        sessions.add_columns("ID", "Title", "Run", "Updated")
         links = self.query_one("#links", DataTable)
-        links.add_columns("Source", "Target", "Required", "Status", "Description")
+        links.add_columns("Source", "Target", "Required", "Message", "Description")
         self.set_interval(self.AUTO_REFRESH_SECONDS, self.action_refresh, name="auto-refresh")
         self.action_refresh()
         experiments.focus()
@@ -111,6 +126,32 @@ class VibeBoardApp(App):
         if self.selected_exp_id not in {experiment.id for experiment in snapshot.experiments}:
             self.selected_exp_id = snapshot.experiments[0].id if snapshot.experiments else None
         self.render_snapshot()
+        await self.refresh_session_run_states(snapshot)
+        self.render_selection()
+
+    async def refresh_session_run_states(self, snapshot: Snapshot) -> None:
+        session_ids = tuple(sorted({session.id for experiment in snapshot.experiments for session in experiment.sessions}))
+        if not session_ids:
+            self.session_run_states = {}
+            self.session_run_ids = ()
+            return
+        if not self.should_refresh_session_run_states(session_ids):
+            return
+
+        try:
+            loaded_states = await asyncio.to_thread(self.session_run_loader, session_ids)
+        except Exception:
+            loaded_states = {}
+        self.session_run_states = {
+            session_id: loaded_states.get(session_id, UNKNOWN_RUN_STATE) for session_id in session_ids
+        }
+        self.session_run_ids = session_ids
+        self.last_session_run_refresh = time.monotonic()
+
+    def should_refresh_session_run_states(self, session_ids: Sequence[str]) -> bool:
+        if tuple(session_ids) != tuple(self.session_run_ids):
+            return True
+        return time.monotonic() - self.last_session_run_refresh >= self.CODEX_RUN_REFRESH_SECONDS
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         row_key = row_key_value(event.row_key)
@@ -149,7 +190,6 @@ class VibeBoardApp(App):
             table.add_row(
                 experiment.id,
                 experiment.title,
-                experiment.status,
                 experiment.branch,
                 experiment.updated_at,
                 key=experiment.id,
@@ -189,7 +229,7 @@ class VibeBoardApp(App):
             sessions.add_row(
                 session.id,
                 session.title,
-                session.status or "unknown",
+                self.session_run_state(session),
                 session.updated_at or session.created_at or "unknown",
                 key=session.id,
             )
@@ -205,7 +245,7 @@ class VibeBoardApp(App):
         if experiment is None:
             rules = self.snapshot.map_config.links if self.snapshot else []
             for rule in rules:
-                links.add_row(rule.source, rule.target, str(rule.required), "no experiment", rule.description)
+                links.add_row(rule.source, rule.target, str(rule.required), "", rule.description)
             return
 
         for link in experiment.link_statuses:
@@ -213,7 +253,7 @@ class VibeBoardApp(App):
                 link.rule.source,
                 link.rule.target,
                 str(link.rule.required),
-                "{0}: {1}".format(link.status, link.message),
+                link.message,
                 link.rule.description,
             )
 
@@ -233,6 +273,9 @@ class VibeBoardApp(App):
             if session.id == self.selected_session_id:
                 return session
         return None
+
+    def session_run_state(self, session: AgentSession) -> str:
+        return self.session_run_states.get(session.id, UNKNOWN_RUN_STATE)
 
     def focus_sessions(self) -> None:
         experiment = self.selected_experiment()
@@ -269,7 +312,7 @@ class VibeBoardApp(App):
             "Map config: {0}".format(snapshot.map_config.path),
         ]
         if snapshot.git_error:
-            lines.append("Git status: error: {0}".format(snapshot.git_error))
+            lines.append("Git error: {0}".format(snapshot.git_error))
         if snapshot.map_config.error:
             lines.append("Map config error: {0}".format(snapshot.map_config.error))
         if not snapshot.map_config.exists:
@@ -288,7 +331,6 @@ class VibeBoardApp(App):
                 "",
                 "Experiment: {0}".format(experiment.id),
                 "Title: {0}".format(experiment.title),
-                "Status: {0}".format(experiment.status),
                 "Branch: {0} ({1})".format(experiment.branch, "exists" if experiment.branch_exists else "missing"),
                 "Agent: {0}".format(experiment.agent or "unknown"),
                 "Created: {0}".format(experiment.created_at or "unknown"),
@@ -299,7 +341,6 @@ class VibeBoardApp(App):
                     "registered" if experiment.worktree_registered else "not registered",
                 ),
                 "Worktree exists: {0}".format(experiment.worktree_exists),
-                "Git status: {0}".format(experiment.git_status),
                 "Sessions: {0}".format(len(experiment.sessions)),
                 "Handoff: {0}".format("present" if experiment.handoff_exists else "missing"),
                 "Outputs dir: {0}".format("present" if experiment.outputs_exists else "missing"),
@@ -312,17 +353,7 @@ class VibeBoardApp(App):
         if experiment.warnings:
             lines.extend(["", "Warnings:"])
             lines.extend("- {0}".format(warning) for warning in experiment.warnings)
-        link_counts = summarize_links(experiment)
-        if link_counts:
-            lines.extend(["", "Link status: {0}".format(link_counts)])
         return "\n".join(lines)
-
-
-def summarize_links(experiment: Experiment) -> str:
-    counts = {}
-    for link in experiment.link_statuses:
-        counts[link.status] = counts.get(link.status, 0) + 1
-    return ", ".join("{0} {1}".format(value, key) for key, value in sorted(counts.items()))
 
 
 def row_key_value(row_key: object) -> str:

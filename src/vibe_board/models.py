@@ -62,7 +62,6 @@ class Experiment:
     handoff_exists: bool
     outputs_exists: bool
     logs_exists: bool
-    git_status: str
     sessions: List[AgentSession] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     link_statuses: List[LinkStatus] = field(default_factory=list)

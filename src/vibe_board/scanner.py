@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 from urllib.parse import quote
@@ -88,7 +89,13 @@ def load_experiments(
     experiments: List[Experiment] = []
     for exp_path in sorted((path for path in exps_path.iterdir() if path.is_dir()), key=lambda item: item.name):
         experiments.append(load_experiment(root, exp_path, links, registered_worktrees, branches))
+    experiments.sort(key=experiment_updated_sort_key)
     return with_session_ownership_warnings(experiments)
+
+
+def experiment_updated_sort_key(experiment: Experiment) -> Tuple[bool, float, str]:
+    updated_timestamp = _timestamp_value(experiment.updated_at)
+    return (updated_timestamp is None, -(updated_timestamp or 0), experiment.id)
 
 
 def load_experiment(
@@ -147,7 +154,6 @@ def load_experiment(
         handoff_exists=(exp_path / "handoff.md").exists(),
         outputs_exists=(exp_path / "outputs").is_dir(),
         logs_exists=(exp_path / "logs").is_dir(),
-        git_status=load_worktree_status(worktree_path) if worktree_exists else "missing",
         sessions=sessions,
         warnings=warnings,
         link_statuses=link_statuses,
@@ -353,16 +359,6 @@ def load_branches(root: Path) -> Set[str]:
     return {line.strip() for line in out.splitlines() if line.strip()}
 
 
-def load_worktree_status(worktree_path: Path) -> str:
-    code, out, err = run_git(["status", "--short"], worktree_path)
-    if code != 0:
-        return "git status failed: {0}".format((err.strip() or "unknown error")[:120])
-    changed = [line for line in out.splitlines() if line.strip()]
-    if not changed:
-        return "clean"
-    return "{0} changed file(s)".format(len(changed))
-
-
 def run_git(args: Sequence[str], cwd: Path) -> Tuple[int, str, str]:
     try:
         env = os.environ.copy()
@@ -412,6 +408,28 @@ def _first_string(data: Mapping[str, Any], keys: Sequence[str]) -> str:
         else:
             return str(value)
     return ""
+
+
+def _timestamp_value(value: str) -> Optional[float]:
+    text = value.strip()
+    if not text:
+        return None
+
+    try:
+        return float(text)
+    except ValueError:
+        pass
+
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
 
 
 def _mtime_text(path: Path) -> str:

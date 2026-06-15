@@ -79,6 +79,42 @@ class ScannerSessionTests(unittest.TestCase):
         self.assertIn("session shared-session is also recorded by experiment(s): two", warnings["one"])
         self.assertIn("session shared-session is also recorded by experiment(s): one", warnings["two"])
 
+    def test_experiments_are_sorted_by_updated_at_descending(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            exps_root = root / ".agents" / "exps"
+            manifests = {
+                "alpha": "2026-06-15T10:00:00+08:00",
+                "bravo": "2026-06-15T12:00:00+08:00",
+                "charlie": "2026-06-15T11:00:00+08:00",
+            }
+            for exp_id, updated_at in manifests.items():
+                exp = exps_root / exp_id
+                (exp / "worktree").mkdir(parents=True)
+                (exp / "outputs").mkdir()
+                (exp / "logs").mkdir()
+                (exp / "plan.md").write_text("# Plan\n", encoding="utf-8")
+                (exp / "manifest.json").write_text(
+                    json.dumps(
+                        {
+                            "id": exp_id,
+                            "title": exp_id.title(),
+                            "branch": "agents/{0}".format(exp_id),
+                            "updated_at": updated_at,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            experiments = load_experiments(
+                root,
+                links=[],
+                registered_worktrees={(exps_root / exp_id / "worktree").resolve() for exp_id in manifests},
+                branches={"agents/{0}".format(exp_id) for exp_id in manifests},
+            )
+
+        self.assertEqual([experiment.id for experiment in experiments], ["bravo", "charlie", "alpha"])
+
 
 if __name__ == "__main__":
     unittest.main()

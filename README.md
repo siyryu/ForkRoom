@@ -14,6 +14,10 @@ Move the experiment cursor to inspect its details, symlink status, and recorded 
 Press `Enter` on an experiment to focus its sessions, then press `Enter` on a session to open its Codex deep link.
 Press `Esc` to return focus to the experiments table.
 
+The sessions table includes a `Run` column when Codex runtime state is available. Vibe Board queries the local Codex App Server and falls back to `unknown` if Codex is unavailable, times out, or cannot read a thread.
+
+Vibe Board resolves `codex` from `PATH`, then falls back to the macOS Codex.app bundle. Set `VIBE_BOARD_CODEX_BIN` to override the executable path.
+
 Or point it at a repository:
 
 ```bash
@@ -56,7 +60,7 @@ Experiments can record the Codex conversations that belong to them in `manifest.
 }
 ```
 
-`sessions` is optional. If a session entry omits `deeplink`, Vibe Board derives `codex://threads/<id>`. A session should appear in exactly one experiment; duplicate ownership is reported as an experiment warning.
+`sessions` is optional. If a session entry omits `deeplink`, Vibe Board derives `codex://threads/<id>`. A session should appear in exactly one experiment; duplicate ownership is reported as an experiment warning. The manifest `status` field is metadata only; the TUI's `Run` column comes from Codex runtime state.
 
 Record a Codex session on an experiment manifest with:
 
