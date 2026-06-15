@@ -18,11 +18,11 @@ Use this layout for every experiment:
 ```text
 .agents/exps/<exp-id>/
   manifest.json
-  plan.md
   worktree/
   outputs/
   logs/
-  handoff.md
+  plan.md      # optional; only when planning is requested
+  handoff.md   # optional; usually generated during merge review
 ```
 
 Use branch names in the form `agents/<exp-id>`. Keep `.agents/exps/` ignored by the main repository.
@@ -61,24 +61,29 @@ If the current Codex thread is the session starting this experiment, record it b
 
 ## Create An Experiment
 
-1. Confirm the repository is clean enough for a parallel experiment with `git status --short`.
-2. Choose a lowercase hyphenated `<exp-id>` and create `.agents/exps/<exp-id>/outputs` and `.agents/exps/<exp-id>/logs`.
-3. Create branch `agents/<exp-id>` from the current main worktree HEAD.
-4. Create the worktree at `.agents/exps/<exp-id>/worktree`.
-5. Write `manifest.json` and `plan.md` in the experiment directory.
-6. If the current Codex thread id is known, run `python3 scripts/record_session.py --root . --exp "<exp-id>" --thread-id "<codex-thread-id>" --title "<session-title>" --status running`.
-7. Apply `.vibe-board/worktree-map.json` by creating symlinks in the experiment worktree.
-8. Do all experiment code changes inside `.agents/exps/<exp-id>/worktree`, not in the main worktree.
+Default to the deterministic initializer instead of manually running each setup command. The main agent should:
 
-Use non-interactive git commands. Do not commit unless the user explicitly asks.
+1. Choose or derive a lowercase hyphenated `<exp-id>`, a title, a one-sentence summary, and a session title from the user's request.
+2. Read `CODEX_THREAD_ID` from the current environment if it is available. Do not invent a thread id, and do not ask the subagent to discover it.
+3. Delegate the initialization to a subagent when the user asks for subagent-based setup. The subagent should only call `scripts/init_experiment.py` with the provided parameters and return the script's structured result plus a concise status.
+4. Summarize the result for the user.
 
-Recommended command shape:
+The initializer is responsible for the deterministic workflow:
 
 ```bash
-mkdir -p ".agents/exps/<exp-id>/outputs" ".agents/exps/<exp-id>/logs"
-git branch "agents/<exp-id>" HEAD
-git worktree add ".agents/exps/<exp-id>/worktree" "agents/<exp-id>"
+python3 scripts/init_experiment.py \
+  --root . \
+  --id "<exp-id>" \
+  --title "<title>" \
+  --summary "<summary>" \
+  --session-title "<session-title>" \
+  --thread-id "<codex-thread-id>" \
+  --status running
 ```
+
+Omit `--thread-id` when the current Codex thread id is unavailable. The script confirms the repository is clean enough for a parallel experiment, checks for existing experiment directories, branches, and worktrees, creates `.agents/exps/<exp-id>/outputs` and `.agents/exps/<exp-id>/logs`, creates branch `agents/<exp-id>` from the current main worktree HEAD, creates the worktree at `.agents/exps/<exp-id>/worktree`, writes `manifest.json`, records the Codex session when a thread id is provided, applies `.vibe-board/worktree-map.json`, and emits JSON describing paths, warnings, and failures.
+
+Do not create `plan.md` during default initialization. Write `plan.md` only when the user explicitly asks for a plan, enters Plan mode, or provides plan content to save. Do all experiment code changes inside `.agents/exps/<exp-id>/worktree`, not in the main worktree. Use non-interactive git commands. Do not commit unless the user explicitly asks.
 
 If the branch or worktree already exists, stop and explain the conflict rather than reusing it silently.
 

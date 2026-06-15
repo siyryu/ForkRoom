@@ -20,7 +20,22 @@ Or point it at a repository:
 vibe-board --root /path/to/repo
 ```
 
-The TUI does not create experiments, worktrees, symlinks, commits, or handoffs. Those workflows are handled by the companion `skills/vibe-board` skill.
+The TUI does not create experiments, worktrees, symlinks, commits, or handoffs. Those workflows are handled by companion scripts and the `skills/vibe-board` skill.
+
+Create an experiment with the deterministic initializer:
+
+```bash
+python3 scripts/init_experiment.py \
+  --root . \
+  --id my-experiment \
+  --title "My Experiment" \
+  --summary "Explore a focused change in an isolated worktree." \
+  --session-title "Initialize my experiment" \
+  --thread-id 019e7831-63b8-7ca2-a4f7-47593e2846ea \
+  --status running
+```
+
+The initializer validates the repository, checks for experiment/branch/worktree conflicts, creates the experiment directories, branch, and worktree, writes `manifest.json`, records the Codex session when `--thread-id` is provided, applies `.vibe-board/worktree-map.json`, and prints structured JSON. It does not create `plan.md`; write a plan only when a user asks for one or enters Plan mode.
 
 Experiments can record the Codex conversations that belong to them in `manifest.json`:
 
