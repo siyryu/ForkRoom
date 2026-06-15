@@ -87,6 +87,10 @@ Do not create `plan.md` during default initialization. Write `plan.md` only when
 
 If the branch or worktree already exists, stop and explain the conflict rather than reusing it silently.
 
+## Edit Experiment Files
+
+When editing experiment code with Codex's `apply_patch` tool, make every patch filename explicitly point into the experiment worktree. `apply_patch` does not take a shell `workdir`, so a bare path such as `skills/vibe-board/SKILL.md` is resolved from the Codex thread's current repository root and can modify the main worktree instead of the experiment worktree.
+
 ## Apply Worktree Mapping
 
 Read `.vibe-board/worktree-map.json`. Each rule has `source`, `target`, `required`, and `description`.
