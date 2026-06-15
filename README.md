@@ -42,3 +42,16 @@ Experiments can record the Codex conversations that belong to them in `manifest.
 ```
 
 `sessions` is optional. If a session entry omits `deeplink`, Vibe Board derives `codex://threads/<id>`. A session should appear in exactly one experiment; duplicate ownership is reported as an experiment warning.
+
+Record a Codex session on an experiment manifest with:
+
+```bash
+python3 scripts/record_session.py \
+  --root . \
+  --exp my-experiment \
+  --thread-id 019e7831-63b8-7ca2-a4f7-47593e2846ea \
+  --title "Initial implementation" \
+  --status running
+```
+
+The script appends or updates the session in `.agents/exps/<exp-id>/manifest.json`, fills default metadata, derives the Codex deeplink when omitted, and rejects session ids already owned by another experiment.
