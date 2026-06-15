@@ -11,6 +11,7 @@ from textual.widgets import DataTable, Footer, Header, Static
 from .codex_status import UNKNOWN_RUN_STATE, load_codex_run_states
 from .models import AgentSession, Experiment, Snapshot
 from .scanner import scan_repository
+from .time_format import friendly_time
 
 SessionRunLoader = Callable[[Sequence[str]], Mapping[str, str]]
 
@@ -191,7 +192,7 @@ class VibeBoardApp(App):
                 experiment.id,
                 experiment.title,
                 experiment.branch,
-                experiment.updated_at,
+                friendly_time(experiment.updated_at),
                 key=experiment.id,
             )
             if experiment.id == self.selected_exp_id:
@@ -230,7 +231,7 @@ class VibeBoardApp(App):
                 session.id,
                 session.title,
                 self.session_run_state(session),
-                session.updated_at or session.created_at or "unknown",
+                friendly_time(session.updated_at or session.created_at),
                 key=session.id,
             )
             if session.id == self.selected_session_id:
@@ -333,8 +334,8 @@ class VibeBoardApp(App):
                 "Title: {0}".format(experiment.title),
                 "Branch: {0} ({1})".format(experiment.branch, "exists" if experiment.branch_exists else "missing"),
                 "Agent: {0}".format(experiment.agent or "unknown"),
-                "Created: {0}".format(experiment.created_at or "unknown"),
-                "Updated: {0}".format(experiment.updated_at or "unknown"),
+                "Created: {0}".format(friendly_time(experiment.created_at)),
+                "Updated: {0}".format(friendly_time(experiment.updated_at)),
                 "Path: {0}".format(experiment.path),
                 "Worktree: {0} ({1})".format(
                     experiment.worktree_path,
