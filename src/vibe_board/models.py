@@ -4,6 +4,18 @@ from typing import List, Optional
 
 
 @dataclass(frozen=True)
+class AgentSession:
+    id: str
+    title: str
+    agent: str
+    status: str
+    created_at: str
+    updated_at: str
+    deeplink: str
+    origin: str = ""
+
+
+@dataclass(frozen=True)
 class LinkRule:
     source: str
     target: str
@@ -51,6 +63,7 @@ class Experiment:
     outputs_exists: bool
     logs_exists: bool
     git_status: str
+    sessions: List[AgentSession] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     link_statuses: List[LinkStatus] = field(default_factory=list)
 

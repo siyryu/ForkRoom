@@ -44,13 +44,29 @@ Use branch names in the form `agents/<exp-id>`. Keep `.agents/exps/` ignored by 
 
 Allowed statuses are `draft`, `running`, `ready`, `handoff`, `merged`, and `archived`.
 
+`sessions` is optional when no Codex conversation has been associated yet. Use it to record Codex conversation sessions that belong to the experiment:
+
+```json
+{
+  "id": "019e7831-63b8-7ca2-a4f7-47593e2846ea",
+  "title": "Initial implementation",
+  "agent": "codex",
+  "status": "running",
+  "created_at": "2026-06-15T10:00:00+08:00",
+  "updated_at": "2026-06-15T10:30:00+08:00",
+  "deeplink": "codex://threads/019e7831-63b8-7ca2-a4f7-47593e2846ea"
+}
+```
+
+Every Codex session can belong to only one experiment. When an experiment creates a new session, append it to that experiment's `manifest.json` `sessions` list. When a Codex session starts a new experiment, write that session into the new experiment's `manifest.json` before handing it off. If `deeplink` is omitted, the TUI derives `codex://threads/<session-id>`.
+
 ## Create An Experiment
 
 1. Confirm the repository is clean enough for a parallel experiment with `git status --short`.
 2. Choose a lowercase hyphenated `<exp-id>` and create `.agents/exps/<exp-id>/outputs` and `.agents/exps/<exp-id>/logs`.
 3. Create branch `agents/<exp-id>` from the current main worktree HEAD.
 4. Create the worktree at `.agents/exps/<exp-id>/worktree`.
-5. Write `manifest.json` and `plan.md` in the experiment directory.
+5. Write `manifest.json` and `plan.md` in the experiment directory. If the current Codex thread is the session starting this experiment, include it in `manifest.json` `sessions`.
 6. Apply `.vibe-board/worktree-map.json` by creating symlinks in the experiment worktree.
 7. Do all experiment code changes inside `.agents/exps/<exp-id>/worktree`, not in the main worktree.
 

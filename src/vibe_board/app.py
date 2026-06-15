@@ -1,4 +1,5 @@
 import asyncio
+import webbrowser
 from pathlib import Path
 from typing import Optional
 
@@ -6,7 +7,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Footer, Header, Static
 
-from .models import Experiment, Snapshot
+from .models import AgentSession, Experiment, Snapshot
 from .scanner import scan_repository
 
 
@@ -36,15 +37,21 @@ class VibeBoardApp(App):
     }
 
     #details {
-        width: 1fr;
+        width: 2fr;
         height: 100%;
         border: solid $accent;
         padding: 1 2;
         overflow-y: auto;
     }
 
-    #links {
+    #sessions-panel {
         width: 1fr;
+        height: 100%;
+        border: solid $accent;
+    }
+
+    #links {
+        width: 2fr;
         height: 100%;
         border: solid $accent;
     }
@@ -56,6 +63,7 @@ class VibeBoardApp(App):
 
     BINDINGS = [
         ("r", "refresh", "Refresh"),
+        ("escape", "focus_experiments", "Experiments"),
         ("q", "quit", "Quit"),
     ]
 
@@ -64,6 +72,7 @@ class VibeBoardApp(App):
         self.root = root
         self.snapshot: Optional[Snapshot] = None
         self.selected_exp_id: Optional[str] = None
+        self.selected_session_id: Optional[str] = None
         self.refresh_worker = None
 
     def compose(self) -> ComposeResult:
@@ -74,16 +83,22 @@ class VibeBoardApp(App):
                 yield DataTable(id="experiments", cursor_type="row")
             with Horizontal(id="lower-panels"):
                 yield Static("Loading repository state...", id="details")
+                with Vertical(id="sessions-panel"):
+                    yield Static("Sessions (0)", id="sessions-title")
+                    yield DataTable(id="sessions", cursor_type="row")
                 yield DataTable(id="links")
         yield Footer()
 
     def on_mount(self) -> None:
         experiments = self.query_one("#experiments", DataTable)
         experiments.add_columns("ID", "Title", "Status", "Branch", "Updated")
+        sessions = self.query_one("#sessions", DataTable)
+        sessions.add_columns("ID", "Title", "Status", "Updated")
         links = self.query_one("#links", DataTable)
         links.add_columns("Source", "Target", "Required", "Status", "Description")
         self.set_interval(self.AUTO_REFRESH_SECONDS, self.action_refresh, name="auto-refresh")
         self.action_refresh()
+        experiments.focus()
 
     def action_refresh(self) -> None:
         if self.refresh_worker is not None and not self.refresh_worker.is_finished:
@@ -97,12 +112,31 @@ class VibeBoardApp(App):
             self.selected_exp_id = snapshot.experiments[0].id if snapshot.experiments else None
         self.render_snapshot()
 
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        if event.data_table.id != "experiments":
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        row_key = row_key_value(event.row_key)
+        if event.data_table.id == "experiments":
+            if row_key != self.selected_exp_id:
+                self.selected_exp_id = row_key
+                self.selected_session_id = None
+                self.render_selection()
             return
-        row_key = event.row_key
-        self.selected_exp_id = str(getattr(row_key, "value", row_key))
-        self.render_selection()
+        if event.data_table.id == "sessions":
+            self.selected_session_id = row_key
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        row_key = row_key_value(event.row_key)
+        if event.data_table.id == "experiments":
+            self.selected_exp_id = row_key
+            self.render_selection()
+            self.focus_sessions()
+            return
+        if event.data_table.id == "sessions":
+            self.selected_session_id = row_key
+            session = self.selected_session()
+            if session is None:
+                self.notify("No session selected.", severity="warning")
+                return
+            self.run_worker(self.open_session_deeplink(session), name="open-session", group="open", exclusive=True)
 
     def render_snapshot(self) -> None:
         if self.snapshot is None:
@@ -110,7 +144,8 @@ class VibeBoardApp(App):
 
         table = self.query_one("#experiments", DataTable)
         table.clear()
-        for experiment in self.snapshot.experiments:
+        selected_row = 0
+        for index, experiment in enumerate(self.snapshot.experiments):
             table.add_row(
                 experiment.id,
                 experiment.title,
@@ -119,6 +154,10 @@ class VibeBoardApp(App):
                 experiment.updated_at,
                 key=experiment.id,
             )
+            if experiment.id == self.selected_exp_id:
+                selected_row = index
+        if self.snapshot.experiments:
+            table.move_cursor(row=selected_row, column=0, animate=False)
         self.render_selection()
 
     def render_selection(self) -> None:
@@ -127,7 +166,37 @@ class VibeBoardApp(App):
 
         experiment = self.selected_experiment()
         self.query_one("#details", Static).update(self.details_text(experiment))
+        self.render_sessions(experiment)
         self.render_links(experiment)
+
+    def render_sessions(self, experiment: Optional[Experiment]) -> None:
+        sessions = self.query_one("#sessions", DataTable)
+        title = self.query_one("#sessions-title", Static)
+        sessions.clear()
+
+        if experiment is None:
+            self.selected_session_id = None
+            title.update("Sessions (0)")
+            return
+
+        title.update("Sessions ({0})".format(len(experiment.sessions)))
+        session_ids = {session.id for session in experiment.sessions}
+        if self.selected_session_id not in session_ids:
+            self.selected_session_id = experiment.sessions[0].id if experiment.sessions else None
+
+        selected_row = 0
+        for index, session in enumerate(experiment.sessions):
+            sessions.add_row(
+                session.id,
+                session.title,
+                session.status or "unknown",
+                session.updated_at or session.created_at or "unknown",
+                key=session.id,
+            )
+            if session.id == self.selected_session_id:
+                selected_row = index
+        if experiment.sessions:
+            sessions.move_cursor(row=selected_row, column=0, animate=False)
 
     def render_links(self, experiment: Optional[Experiment]) -> None:
         links = self.query_one("#links", DataTable)
@@ -155,6 +224,39 @@ class VibeBoardApp(App):
             if experiment.id == self.selected_exp_id:
                 return experiment
         return None
+
+    def selected_session(self) -> Optional[AgentSession]:
+        experiment = self.selected_experiment()
+        if experiment is None or self.selected_session_id is None:
+            return None
+        for session in experiment.sessions:
+            if session.id == self.selected_session_id:
+                return session
+        return None
+
+    def focus_sessions(self) -> None:
+        experiment = self.selected_experiment()
+        if experiment is None:
+            self.notify("No experiment selected.", severity="warning")
+            return
+        if not experiment.sessions:
+            self.notify("No sessions recorded for {0}.".format(experiment.id), severity="warning")
+            return
+        self.query_one("#sessions", DataTable).focus()
+
+    def action_focus_experiments(self) -> None:
+        self.query_one("#experiments", DataTable).focus()
+
+    async def open_session_deeplink(self, session: AgentSession) -> None:
+        try:
+            opened = await asyncio.to_thread(webbrowser.open, session.deeplink)
+        except Exception as exc:
+            self.notify("Failed to open session: {0}".format(exc), severity="error")
+            return
+        if opened:
+            self.notify("Opening session {0}".format(session.id), severity="information")
+        else:
+            self.notify("Could not open {0}".format(session.deeplink), severity="error")
 
     def details_text(self, experiment: Optional[Experiment]) -> str:
         snapshot = self.snapshot
@@ -198,6 +300,7 @@ class VibeBoardApp(App):
                 ),
                 "Worktree exists: {0}".format(experiment.worktree_exists),
                 "Git status: {0}".format(experiment.git_status),
+                "Sessions: {0}".format(len(experiment.sessions)),
                 "Handoff: {0}".format("present" if experiment.handoff_exists else "missing"),
                 "Outputs dir: {0}".format("present" if experiment.outputs_exists else "missing"),
                 "Logs dir: {0}".format("present" if experiment.logs_exists else "missing"),
@@ -220,3 +323,7 @@ def summarize_links(experiment: Experiment) -> str:
     for link in experiment.link_statuses:
         counts[link.status] = counts.get(link.status, 0) + 1
     return ", ".join("{0} {1}".format(value, key) for key, value in sorted(counts.items()))
+
+
+def row_key_value(row_key: object) -> str:
+    return str(getattr(row_key, "value", row_key))

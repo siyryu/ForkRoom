@@ -1,10 +1,12 @@
 import json
 import os
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
+from urllib.parse import quote
 
-from .models import Experiment, LinkRule, LinkStatus, MapConfig, Snapshot
+from .models import AgentSession, Experiment, LinkRule, LinkStatus, MapConfig, Snapshot
 
 
 EXPS_DIR = Path(".agents") / "exps"
@@ -86,7 +88,7 @@ def load_experiments(
     experiments: List[Experiment] = []
     for exp_path in sorted((path for path in exps_path.iterdir() if path.is_dir()), key=lambda item: item.name):
         experiments.append(load_experiment(root, exp_path, links, registered_worktrees, branches))
-    return experiments
+    return with_session_ownership_warnings(experiments)
 
 
 def load_experiment(
@@ -110,6 +112,7 @@ def load_experiment(
     updated_at = _string_value(manifest, "updated_at", _mtime_text(manifest_path if manifest_path.exists() else exp_path))
     summary = _string_value(manifest, "summary", "")
     agent = _string_value(manifest, "agent", "")
+    sessions = load_sessions(manifest, warnings, default_agent=agent)
 
     worktree_path = exp_path / "worktree"
     worktree_exists = worktree_path.exists()
@@ -145,9 +148,125 @@ def load_experiment(
         outputs_exists=(exp_path / "outputs").is_dir(),
         logs_exists=(exp_path / "logs").is_dir(),
         git_status=load_worktree_status(worktree_path) if worktree_exists else "missing",
+        sessions=sessions,
         warnings=warnings,
         link_statuses=link_statuses,
     )
+
+
+def load_sessions(manifest: Mapping[str, Any], warnings: List[str], default_agent: str = "") -> List[AgentSession]:
+    raw_sessions = raw_manifest_sessions(manifest)
+    if raw_sessions is None:
+        return []
+    if not isinstance(raw_sessions, list):
+        warnings.append("sessions must be a list")
+        return []
+
+    sessions: List[AgentSession] = []
+    seen_ids: Set[str] = set()
+    for index, item in enumerate(raw_sessions):
+        session = parse_session(item, index, warnings, default_agent)
+        if session is None:
+            continue
+        if session.id in seen_ids:
+            warnings.append("session {0} is listed more than once".format(session.id))
+            continue
+        seen_ids.add(session.id)
+        sessions.append(session)
+    return sessions
+
+
+def raw_manifest_sessions(manifest: Mapping[str, Any]) -> Optional[Any]:
+    if "sessions" in manifest:
+        return manifest.get("sessions")
+    if "session" in manifest:
+        return [manifest.get("session")]
+    if "session_id" in manifest:
+        return [
+            {
+                "id": manifest.get("session_id"),
+                "title": manifest.get("session_title", ""),
+                "deeplink": manifest.get("session_deeplink", ""),
+            }
+        ]
+    return None
+
+
+def parse_session(
+    item: Any,
+    index: int,
+    warnings: List[str],
+    default_agent: str,
+) -> Optional[AgentSession]:
+    if isinstance(item, str):
+        session_id = item.strip()
+        if not session_id:
+            warnings.append("sessions[{0}] is empty".format(index))
+            return None
+        return AgentSession(
+            id=session_id,
+            title=session_id,
+            agent=default_agent,
+            status="",
+            created_at="",
+            updated_at="",
+            deeplink=codex_thread_deeplink(session_id),
+        )
+
+    if not isinstance(item, Mapping):
+        warnings.append("sessions[{0}] must be a string or object".format(index))
+        return None
+
+    session_id = _first_string(item, ("id", "session_id", "thread_id"))
+    if not session_id:
+        warnings.append("sessions[{0}] must include id, session_id, or thread_id".format(index))
+        return None
+
+    deeplink = _first_string(item, ("deeplink", "deep_link", "url"))
+    return AgentSession(
+        id=session_id,
+        title=_first_string(item, ("title", "name")) or session_id,
+        agent=_first_string(item, ("agent",)) or default_agent,
+        status=_first_string(item, ("status",)),
+        created_at=_first_string(item, ("created_at", "started_at")),
+        updated_at=_first_string(item, ("updated_at", "last_active_at")),
+        deeplink=deeplink or codex_thread_deeplink(session_id),
+        origin=_first_string(item, ("origin", "source")),
+    )
+
+
+def codex_thread_deeplink(session_id: str) -> str:
+    return "codex://threads/{0}".format(quote(session_id, safe=""))
+
+
+def with_session_ownership_warnings(experiments: List[Experiment]) -> List[Experiment]:
+    owners: Dict[str, List[str]] = {}
+    for experiment in experiments:
+        for session in experiment.sessions:
+            owners.setdefault(session.id, []).append(experiment.id)
+
+    duplicate_owners = {
+        session_id: sorted(set(exp_ids))
+        for session_id, exp_ids in owners.items()
+        if len(set(exp_ids)) > 1
+    }
+    if not duplicate_owners:
+        return experiments
+
+    updated: List[Experiment] = []
+    for experiment in experiments:
+        warnings = list(experiment.warnings)
+        for session in experiment.sessions:
+            exp_ids = duplicate_owners.get(session.id)
+            if exp_ids:
+                warnings.append(
+                    "session {0} is also recorded by experiment(s): {1}; a session can only belong to one experiment".format(
+                        session.id,
+                        ", ".join(exp_id for exp_id in exp_ids if exp_id != experiment.id),
+                    )
+                )
+        updated.append(replace(experiment, warnings=warnings))
+    return updated
 
 
 def inspect_link(root: Path, worktree_path: Path, rule: LinkRule) -> LinkStatus:
@@ -279,6 +398,20 @@ def _safe_int(value: Any) -> Optional[int]:
 def _string_value(data: Mapping[str, Any], key: str, default: str) -> str:
     value = data.get(key, default)
     return value if isinstance(value, str) else str(value)
+
+
+def _first_string(data: Mapping[str, Any], keys: Sequence[str]) -> str:
+    for key in keys:
+        value = data.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            value = value.strip()
+            if value:
+                return value
+        else:
+            return str(value)
+    return ""
 
 
 def _mtime_text(path: Path) -> str:
