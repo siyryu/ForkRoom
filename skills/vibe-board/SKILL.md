@@ -11,6 +11,14 @@ Use this skill to keep agent coding experiments isolated from the main worktree.
 
 Never write secrets or local key contents into plans, logs, manifests, or handoffs.
 
+## Worktree Context Guardrails
+
+When operating from a path under `.agents/exps/<exp-id>/`, treat `.agents/exps/<exp-id>/worktree` as the default repository context for browsing, editing, testing, and git commands. If the user references or @-mentions a file from the main worktree while the task is experiment-scoped, prefer the corresponding path inside the experiment worktree unless the user explicitly says the main worktree should be inspected or changed.
+
+Require explicit user confirmation before making any modification to the main worktree from an experiment-scoped task. This includes direct file edits, generated files, formatter rewrites, package-manager lockfile changes, git operations, and patches that would resolve outside `.agents/exps/<exp-id>/worktree`.
+
+Use main-worktree files only as read-only context by default. If a referenced main-worktree file has no corresponding experiment-worktree path and a write seems necessary, stop and ask whether to edit main or create/change the file inside the experiment worktree.
+
 ## Experiment Layout
 
 Use this layout for every experiment:
