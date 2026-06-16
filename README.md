@@ -24,12 +24,12 @@ Or point it at a repository:
 vibe-board --root /path/to/repo
 ```
 
-The TUI does not create experiments, worktrees, symlinks, commits, or handoffs. Those workflows are handled by companion scripts and the `skills/vibe-board` skill.
+The TUI does not create experiments, worktrees, symlinks, commits, or handoffs. Those workflows are handled by CLI subcommands and the `skills/vibe-board` skill.
 
 Create an experiment with the deterministic initializer:
 
 ```bash
-python3 scripts/init_experiment.py \
+vibe-board init \
   --root . \
   --id my-experiment \
   --title "My Experiment" \
@@ -65,7 +65,7 @@ Experiments can record the Codex conversations that belong to them in `manifest.
 Record a Codex session on an experiment manifest with:
 
 ```bash
-python3 scripts/record_session.py \
+vibe-board record-session \
   --root . \
   --exp my-experiment \
   --thread-id 019e7831-63b8-7ca2-a4f7-47593e2846ea \
@@ -73,4 +73,6 @@ python3 scripts/record_session.py \
   --status running
 ```
 
-The script appends or updates the session in `.agents/exps/<exp-id>/manifest.json`, fills default metadata, derives the Codex deeplink when omitted, and rejects session ids already owned by another experiment.
+The command appends or updates the session in `.agents/exps/<exp-id>/manifest.json`, fills default metadata, derives the Codex deeplink when omitted, and rejects session ids already owned by another experiment.
+
+The legacy `python3 scripts/init_experiment.py` and `python3 scripts/record_session.py` entry points remain as compatibility wrappers when working from the Vibe Board source tree.

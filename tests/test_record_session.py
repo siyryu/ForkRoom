@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.record_session import RecordSessionError, codex_thread_deeplink, record_session
+from vibe_board.record_session import RecordSessionError, codex_thread_deeplink, record_session
 
 
 class RecordSessionTest(unittest.TestCase):

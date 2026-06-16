@@ -44,12 +44,12 @@ Use branch names in the form `agents/<exp-id>`. Keep `.agents/exps/` ignored by 
 
 Allowed statuses are `draft`, `running`, `ready`, `handoff`, `merged`, and `archived`.
 
-`sessions` is optional when no Codex conversation has been associated yet. Record Codex conversation sessions with `scripts/record_session.py` instead of hand-editing session JSON. The script fills session defaults, derives `codex://threads/<thread-id>` when no deeplink is provided, updates an existing session entry instead of duplicating it, and refuses to record a session already owned by another experiment.
+`sessions` is optional when no Codex conversation has been associated yet. Record Codex conversation sessions with `vibe-board record-session` instead of hand-editing session JSON. The command fills session defaults, derives `codex://threads/<thread-id>` when no deeplink is provided, updates an existing session entry instead of duplicating it, and refuses to record a session already owned by another experiment.
 
 Use this command after the experiment manifest exists and the Codex thread id is known:
 
 ```bash
-python3 scripts/record_session.py \
+vibe-board record-session \
   --root . \
   --exp "<exp-id>" \
   --thread-id "<codex-thread-id>" \
@@ -65,13 +65,13 @@ Default to the deterministic initializer instead of manually running each setup 
 
 1. Choose or derive a lowercase hyphenated `<exp-id>`, a title, a one-sentence summary, and a session title from the user's request.
 2. Read `CODEX_THREAD_ID` from the current environment if it is available. Do not invent a thread id, and do not ask the subagent to discover it.
-3. Delegate the initialization to a subagent when the user asks for subagent-based setup. The subagent should only call `scripts/init_experiment.py` with the provided parameters and return the script's structured result plus a concise status.
+3. Delegate the initialization to a subagent when the user asks for subagent-based setup. The subagent should only call `vibe-board init` with the provided parameters and return the command's structured result plus a concise status.
 4. Summarize the result for the user.
 
 The initializer is responsible for the deterministic workflow:
 
 ```bash
-python3 scripts/init_experiment.py \
+vibe-board init \
   --root . \
   --id "<exp-id>" \
   --title "<title>" \
@@ -81,7 +81,7 @@ python3 scripts/init_experiment.py \
   --status running
 ```
 
-Omit `--thread-id` when the current Codex thread id is unavailable. The script confirms the repository is clean enough for a parallel experiment, checks for existing experiment directories, branches, and worktrees, creates `.agents/exps/<exp-id>/outputs` and `.agents/exps/<exp-id>/logs`, creates branch `agents/<exp-id>` from the current main worktree HEAD, creates the worktree at `.agents/exps/<exp-id>/worktree`, writes `manifest.json`, records the Codex session when a thread id is provided, applies `.vibe-board/worktree-map.json`, and emits JSON describing paths, warnings, and failures.
+Omit `--thread-id` when the current Codex thread id is unavailable. The command confirms the repository is clean enough for a parallel experiment, checks for existing experiment directories, branches, and worktrees, creates `.agents/exps/<exp-id>/outputs` and `.agents/exps/<exp-id>/logs`, creates branch `agents/<exp-id>` from the current main worktree HEAD, creates the worktree at `.agents/exps/<exp-id>/worktree`, writes `manifest.json`, records the Codex session when a thread id is provided, applies `.vibe-board/worktree-map.json`, and emits JSON describing paths, warnings, and failures.
 
 Do not create `plan.md` during default initialization. Write `plan.md` only when the user explicitly asks for a plan, enters Plan mode, or provides plan content to save. Do all experiment code changes inside `.agents/exps/<exp-id>/worktree`, not in the main worktree. Use non-interactive git commands. Do not commit unless the user explicitly asks.
 

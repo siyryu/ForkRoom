@@ -1,5 +1,6 @@
 import asyncio
 import time
+from datetime import datetime
 import webbrowser
 from pathlib import Path
 from typing import Callable, Dict, Mapping, Optional, Sequence
@@ -90,6 +91,7 @@ class VibeBoardApp(App):
         self.selected_session_id: Optional[str] = None
         self.session_run_states: Dict[str, str] = {}
         self.session_run_ids: Sequence[str] = ()
+        self._experiment_has_active_run_cache: Dict[str, bool] = {}
         self.experiment_run_spinners: Dict[str, Spinner] = {}
         self.last_session_run_refresh = 0.0
         self.refresh_worker = None
@@ -158,6 +160,7 @@ class VibeBoardApp(App):
             session_id: loaded_states.get(session_id, UNKNOWN_RUN_STATE) for session_id in session_ids
         }
         self.session_run_ids = session_ids
+        self._experiment_has_active_run_cache.clear()
         self.last_session_run_refresh = time.monotonic()
         self.render_experiment_run_indicators()
 
@@ -205,13 +208,14 @@ class VibeBoardApp(App):
             if exp_id in experiment_ids
         }
         selected_row = 0
+        now = datetime.now().astimezone()
         for index, experiment in enumerate(self.snapshot.experiments):
             table.add_row(
                 self.experiment_run_indicator(experiment),
                 experiment.id,
                 experiment.title,
                 experiment.branch,
-                friendly_time(experiment.updated_at),
+                friendly_time(experiment.updated_at, now=now),
                 key=experiment.id,
             )
             if experiment.id == self.selected_exp_id:
@@ -258,12 +262,13 @@ class VibeBoardApp(App):
             self.selected_session_id = experiment.sessions[0].id if experiment.sessions else None
 
         selected_row = 0
+        now = datetime.now().astimezone()
         for index, session in enumerate(experiment.sessions):
             sessions.add_row(
                 session.id,
                 session.title,
                 self.session_run_state(session),
-                friendly_time(session.updated_at or session.created_at),
+                friendly_time(session.updated_at or session.created_at, now=now),
                 key=session.id,
             )
             if session.id == self.selected_session_id:
@@ -293,28 +298,25 @@ class VibeBoardApp(App):
     def selected_experiment(self) -> Optional[Experiment]:
         if self.snapshot is None or self.selected_exp_id is None:
             return None
-        for experiment in self.snapshot.experiments:
-            if experiment.id == self.selected_exp_id:
-                return experiment
-        return None
+        return next((e for e in self.snapshot.experiments if e.id == self.selected_exp_id), None)
 
     def selected_session(self) -> Optional[AgentSession]:
         experiment = self.selected_experiment()
         if experiment is None or self.selected_session_id is None:
             return None
-        for session in experiment.sessions:
-            if session.id == self.selected_session_id:
-                return session
-        return None
+        return next((s for s in experiment.sessions if s.id == self.selected_session_id), None)
 
     def session_run_state(self, session: AgentSession) -> str:
         return self.session_run_states.get(session.id, UNKNOWN_RUN_STATE)
 
     def experiment_has_active_run(self, experiment: Experiment) -> bool:
-        return any(
-            self.session_run_state(session) in self.ACTIVE_EXPERIMENT_RUN_STATES
-            for session in experiment.sessions
-        )
+        if experiment.id not in self._experiment_has_active_run_cache:
+            self._experiment_has_active_run_cache[experiment.id] = any(
+                self.session_run_state(session) in self.ACTIVE_EXPERIMENT_RUN_STATES
+                for session in experiment.sessions
+            )
+        return self._experiment_has_active_run_cache[experiment.id]
+
 
     def experiment_run_indicator(self, experiment: Experiment) -> object:
         if not self.experiment_has_active_run(experiment):
@@ -350,6 +352,7 @@ class VibeBoardApp(App):
 
     def details_text(self, experiment: Optional[Experiment]) -> str:
         snapshot = self.snapshot
+        now = datetime.now().astimezone()
         if snapshot is None:
             return "Loading repository state..."
 
@@ -380,8 +383,8 @@ class VibeBoardApp(App):
                 "Title: {0}".format(experiment.title),
                 "Branch: {0} ({1})".format(experiment.branch, "exists" if experiment.branch_exists else "missing"),
                 "Agent: {0}".format(experiment.agent or "unknown"),
-                "Created: {0}".format(friendly_time(experiment.created_at)),
-                "Updated: {0}".format(friendly_time(experiment.updated_at)),
+                "Created: {0}".format(friendly_time(experiment.created_at, now=now)),
+                "Updated: {0}".format(friendly_time(experiment.updated_at, now=now)),
                 "Path: {0}".format(experiment.path),
                 "Worktree: {0} ({1})".format(
                     experiment.worktree_path,

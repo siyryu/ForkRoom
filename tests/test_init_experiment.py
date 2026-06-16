@@ -1,4 +1,6 @@
 from __future__ import annotations
+from helpers import init_repo, git
+
 
 import json
 import os
@@ -7,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.init_experiment import InitExperimentError, init_experiment, main
+from vibe_board.init_experiment import InitExperimentError, init_experiment, main, branch_exists
 
 
 FIXED_TIME = "2026-06-15T10:00:00+08:00"
@@ -186,53 +188,3 @@ def test_rejects_required_mapping_source_missing(tmp_path: Path) -> None:
     assert raised.value.code == "required_source_missing"
     assert raised.value.step == "worktree-map"
     assert not branch_exists(root, "agents/missing-required-map")
-
-
-def init_repo(
-    tmp_path: Path,
-    *,
-    files: dict[str, str] | None = None,
-    map_config: dict | None = None,
-) -> Path:
-    root = tmp_path / "repo"
-    root.mkdir()
-    git(root, "init")
-    git(root, "checkout", "-b", "main")
-    git(root, "config", "user.name", "Test User")
-    git(root, "config", "user.email", "test@example.com")
-
-    (root / ".gitignore").write_text(".agents/\n", encoding="utf-8")
-    (root / "README.md").write_text("# Test Repo\n", encoding="utf-8")
-    for name, content in (files or {}).items():
-        path = root / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-    if map_config is not None:
-        map_path = root / ".vibe-board" / "worktree-map.json"
-        map_path.parent.mkdir(parents=True)
-        map_path.write_text(json.dumps(map_config, indent=2) + "\n", encoding="utf-8")
-
-    git(root, "add", ".")
-    git(root, "commit", "-m", "Initial commit")
-    return root
-
-
-def branch_exists(root: Path, branch: str) -> bool:
-    return (
-        subprocess.run(
-            ["git", "show-ref", "--verify", "--quiet", "refs/heads/{0}".format(branch)],
-            cwd=root,
-            check=False,
-        ).returncode
-        == 0
-    )
-
-
-def git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args],
-        cwd=root,
-        text=True,
-        capture_output=True,
-        check=True,
-    )

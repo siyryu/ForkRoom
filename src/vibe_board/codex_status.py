@@ -69,15 +69,7 @@ def resolve_codex_bin() -> str:
 
 
 def dedupe_thread_ids(thread_ids: Sequence[str]) -> List[str]:
-    seen = set()
-    unique_thread_ids: List[str] = []
-    for thread_id in thread_ids:
-        text = thread_id.strip()
-        if not text or text in seen:
-            continue
-        seen.add(text)
-        unique_thread_ids.append(text)
-    return unique_thread_ids
+    return list(dict.fromkeys(t.strip() for t in thread_ids if t.strip()))
 
 
 def unknown_states(thread_ids: Sequence[str]) -> Dict[str, str]:

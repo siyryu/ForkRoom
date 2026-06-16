@@ -4,6 +4,7 @@ import subprocess
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 from urllib.parse import quote
 
@@ -16,9 +17,14 @@ MAP_PATH = Path(".vibe-board") / "worktree-map.json"
 
 def scan_repository(root: Path) -> Snapshot:
     root = root.resolve()
-    map_config = load_map_config(root)
-    registered_worktrees, git_error = load_registered_worktrees(root)
-    branches = load_branches(root) if git_error is None else set()
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        map_future = executor.submit(load_map_config, root)
+        worktrees_future = executor.submit(load_registered_worktrees, root)
+        branches_future = executor.submit(load_branches, root)
+    
+    map_config = map_future.result()
+    registered_worktrees, git_error = worktrees_future.result()
+    branches = branches_future.result() if git_error is None else set()
     experiments = load_experiments(root, map_config.links, registered_worktrees, branches)
     return Snapshot(
         root=root,
@@ -87,7 +93,7 @@ def load_experiments(
         return []
 
     experiments: List[Experiment] = []
-    for exp_path in sorted((path for path in exps_path.iterdir() if path.is_dir()), key=lambda item: item.name):
+    for exp_path in (path for path in exps_path.iterdir() if path.is_dir()):
         experiments.append(load_experiment(root, exp_path, links, registered_worktrees, branches))
     experiments.sort(key=experiment_updated_sort_key)
     return with_session_ownership_warnings(experiments)
@@ -107,6 +113,7 @@ def load_experiment(
 ) -> Experiment:
     exp_id = exp_path.name
     manifest_path = exp_path / "manifest.json"
+    manifest_exists = manifest_path.exists()
     manifest, manifest_error = load_manifest(manifest_path)
     warnings: List[str] = []
     if manifest_error:
@@ -115,8 +122,8 @@ def load_experiment(
     title = _string_value(manifest, "title", exp_id)
     status = _string_value(manifest, "status", "unknown")
     branch = _string_value(manifest, "branch", "agents/{0}".format(exp_id))
-    created_at = _string_value(manifest, "created_at", _mtime_text(manifest_path if manifest_path.exists() else exp_path))
-    updated_at = _string_value(manifest, "updated_at", _mtime_text(manifest_path if manifest_path.exists() else exp_path))
+    created_at = _string_value(manifest, "created_at", _mtime_text(manifest_path if manifest_exists else exp_path))
+    updated_at = _string_value(manifest, "updated_at", _mtime_text(manifest_path if manifest_exists else exp_path))
     summary = _string_value(manifest, "summary", "")
     agent = _string_value(manifest, "agent", "")
     sessions = load_sessions(manifest, warnings, default_agent=agent)
@@ -127,14 +134,16 @@ def load_experiment(
     worktree_registered = normalized_worktree_path in registered_worktrees
     branch_exists = branch in branches
 
-    if not manifest_path.exists():
+    if not manifest_exists:
         warnings.append("manifest.json is missing")
     if not worktree_exists:
         warnings.append("worktree directory is missing")
     if branch and not branch_exists:
         warnings.append("branch is missing")
 
-    link_statuses = [inspect_link(root, worktree_path, rule) for rule in links]
+    resolved_root = root.resolve(strict=False)
+    resolved_worktree = worktree_path.resolve(strict=False)
+    link_statuses = [inspect_link(root, worktree_path, resolved_root, resolved_worktree, rule) for rule in links]
 
     return Experiment(
         id=exp_id,
@@ -275,12 +284,12 @@ def with_session_ownership_warnings(experiments: List[Experiment]) -> List[Exper
     return updated
 
 
-def inspect_link(root: Path, worktree_path: Path, rule: LinkRule) -> LinkStatus:
+def inspect_link(root: Path, worktree_path: Path, resolved_root: Path, resolved_worktree: Path, rule: LinkRule) -> LinkStatus:
     source_path = root / rule.source
     target_path = worktree_path / rule.target
 
-    source_safe = is_within(source_path.resolve(strict=False), root.resolve(strict=False))
-    target_safe = is_within(target_path.resolve(strict=False), worktree_path.resolve(strict=False))
+    source_safe = is_within(source_path.resolve(strict=False), resolved_root)
+    target_safe = is_within(target_path.resolve(strict=False), resolved_worktree)
     if not source_safe:
         return LinkStatus(rule, "error", "source escapes repository root", False, False, False, False)
     if not target_safe:
@@ -415,21 +424,9 @@ def _timestamp_value(value: str) -> Optional[float]:
     if not text:
         return None
 
-    try:
-        return float(text)
-    except ValueError:
-        pass
-
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.timestamp()
+    from .time_format import _parse_timestamp
+    parsed = _parse_timestamp(text)
+    return parsed.timestamp() if parsed else None
 
 
 def _mtime_text(path: Path) -> str:
