@@ -3,7 +3,7 @@ import time
 from datetime import datetime
 import webbrowser
 from pathlib import Path
-from typing import Callable, Dict, Mapping, Optional, Sequence
+from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple
 
 from rich.padding import Padding
 from rich.spinner import Spinner
@@ -119,7 +119,7 @@ class VibeBoardApp(App):
         experiments.add_column("Branch", key="branch")
         experiments.add_column("Updated", key="updated")
         sessions = self.query_one("#sessions", DataTable)
-        sessions.add_columns("ID", "Title", "Run", "Updated")
+        sessions.add_columns(("ID", "id"), ("Title", "title"), ("Run", "run"), ("Updated", "updated"))
         links = self.query_one("#links", DataTable)
         links.add_columns("Source", "Target", "Required", "Message", "Description")
         self.set_interval(self.AUTO_REFRESH_SECONDS, self.action_refresh, name="auto-refresh")
@@ -171,14 +171,19 @@ class VibeBoardApp(App):
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         row_key = row_key_value(event.row_key)
+        if row_key != current_cursor_row_key(event.data_table):
+            return
         if event.data_table.id == "experiments":
-            if row_key != self.selected_exp_id:
-                self.selected_exp_id = row_key
-                self.selected_session_id = None
-                self.render_selection()
+            if self.snapshot and any(experiment.id == row_key for experiment in self.snapshot.experiments):
+                if row_key != self.selected_exp_id:
+                    self.selected_exp_id = row_key
+                    self.selected_session_id = None
+                    self.render_selection()
             return
         if event.data_table.id == "sessions":
-            self.selected_session_id = row_key
+            experiment = self.selected_experiment()
+            if experiment and any(session.id == row_key for session in experiment.sessions):
+                self.selected_session_id = row_key
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         row_key = row_key_value(event.row_key)
@@ -249,10 +254,10 @@ class VibeBoardApp(App):
     def render_sessions(self, experiment: Optional[Experiment]) -> None:
         sessions = self.query_one("#sessions", DataTable)
         title = self.query_one("#sessions-title", Static)
-        sessions.clear()
 
         if experiment is None:
             self.selected_session_id = None
+            sync_table_rows(sessions, (), ("id", "title", "run", "updated"))
             title.update("Sessions (0)")
             return
 
@@ -263,18 +268,24 @@ class VibeBoardApp(App):
 
         selected_row = 0
         now = datetime.now().astimezone()
+        rows = []
         for index, session in enumerate(experiment.sessions):
-            sessions.add_row(
-                session.id,
-                session.title,
-                self.session_run_state(session),
-                friendly_time(session.updated_at or session.created_at, now=now),
-                key=session.id,
+            rows.append(
+                (
+                    session.id,
+                    (
+                        session.id,
+                        session.title,
+                        self.session_run_state(session),
+                        friendly_time(session.updated_at or session.created_at, now=now),
+                    ),
+                )
             )
             if session.id == self.selected_session_id:
                 selected_row = index
+        sync_table_rows(sessions, rows, ("id", "title", "run", "updated"))
         if experiment.sessions:
-            sessions.move_cursor(row=selected_row, column=0, animate=False)
+            move_table_cursor(sessions, selected_row)
 
     def render_links(self, experiment: Optional[Experiment]) -> None:
         links = self.query_one("#links", DataTable)
@@ -408,3 +419,41 @@ class VibeBoardApp(App):
 
 def row_key_value(row_key: object) -> str:
     return str(getattr(row_key, "value", row_key))
+
+
+def current_cursor_row_key(table: DataTable) -> Optional[str]:
+    if table.row_count == 0 or not table.is_valid_row_index(table.cursor_coordinate.row):
+        return None
+    try:
+        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
+    except Exception:
+        return None
+    return row_key_value(row_key)
+
+
+def ordered_table_row_keys(table: DataTable) -> Tuple[str, ...]:
+    return tuple(row_key_value(row.key) for row in table.ordered_rows)
+
+
+def sync_table_rows(
+    table: DataTable,
+    rows: Sequence[Tuple[str, Sequence[object]]],
+    column_keys: Sequence[str],
+) -> None:
+    desired_keys = tuple(row_key for row_key, _ in rows)
+    if ordered_table_row_keys(table) != desired_keys:
+        table.clear()
+        for row_key, values in rows:
+            table.add_row(*values, key=row_key)
+        return
+
+    for row_key, values in rows:
+        for column_key, value in zip(column_keys, values):
+            table.update_cell(row_key, column_key, value, update_width=True)
+
+
+def move_table_cursor(table: DataTable, row: int, column: int = 0) -> None:
+    cursor = table.cursor_coordinate
+    if cursor.row == row and cursor.column == column:
+        return
+    table.move_cursor(row=row, column=column, animate=False)

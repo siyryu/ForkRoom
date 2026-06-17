@@ -85,6 +85,54 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
 
                 open_url.assert_called_once_with("codex://threads/019e7831-63b8-7ca2-a4f7-47593e2846ea")
 
+    async def test_render_selection_keeps_session_rows_when_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
+            app = VibeBoardApp(root=root, session_run_loader=lambda ids: {"session-1": "active"})
+
+            async with app.run_test() as pilot:
+                await pilot.pause(0.3)
+                sessions = app.query_one("#sessions", DataTable)
+
+                with patch.object(sessions, "clear", wraps=sessions.clear) as clear:
+                    app.render_selection()
+                    app.render_selection()
+
+                clear.assert_not_called()
+                self.assertEqual(row_values(sessions, 0)[0], "session-1")
+
+    async def test_stale_session_highlight_does_not_change_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_experiment(
+                root,
+                sessions=[
+                    {"id": "session-a", "title": "Session A"},
+                    {"id": "session-b", "title": "Session B"},
+                ],
+            )
+            app = VibeBoardApp(
+                root=root,
+                session_run_loader=lambda ids: {session_id: "active" for session_id in ids},
+            )
+
+            async with app.run_test() as pilot:
+                await pilot.pause(0.3)
+                app.selected_session_id = "session-b"
+                app.render_selection()
+                await pilot.pause(0.1)
+
+                sessions = app.query_one("#sessions", DataTable)
+                stale_first_row = sessions.ordered_rows[0]
+                self.assertEqual(row_values(sessions, 1)[0], "session-b")
+
+                app.on_data_table_row_highlighted(
+                    DataTable.RowHighlighted(sessions, 0, stale_first_row.key)
+                )
+
+                self.assertEqual(app.selected_session_id, "session-b")
+
     async def test_experiment_run_indicator_shows_spinner_for_active_states(self) -> None:
         for run_state in ("active", "waiting"):
             with self.subTest(run_state=run_state), tempfile.TemporaryDirectory() as tmp:
