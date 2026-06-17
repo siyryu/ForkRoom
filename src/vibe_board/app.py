@@ -11,12 +11,14 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Footer, Header, Static
 
+from .codex_focus import CodexFocusSummary, load_codex_focus, unavailable_focus
 from .codex_status import UNKNOWN_RUN_STATE, load_codex_run_states
 from .models import AgentSession, Experiment, Snapshot
 from .scanner import scan_repository
 from .time_format import friendly_time
 
 SessionRunLoader = Callable[[Sequence[str]], Mapping[str, str]]
+SessionFocusLoader = Callable[[str], CodexFocusSummary]
 
 
 class VibeBoardApp(App):
@@ -24,6 +26,8 @@ class VibeBoardApp(App):
 
     AUTO_REFRESH_SECONDS = 2.0
     CODEX_RUN_REFRESH_SECONDS = 10.0
+    CODEX_FOCUS_ACTIVE_REFRESH_SECONDS = 2.0
+    CODEX_FOCUS_IDLE_REFRESH_SECONDS = 10.0
     ACTIVE_EXPERIMENT_RUN_STATES = {"active", "waiting"}
 
     CSS = """
@@ -71,6 +75,17 @@ class VibeBoardApp(App):
         border: solid $accent;
     }
 
+    #sessions {
+        height: 1fr;
+    }
+
+    #codex-focus {
+        height: 8;
+        border-top: solid $accent;
+        padding: 1 1 0 1;
+        overflow-y: auto;
+    }
+
     DataTable {
         height: 1fr;
     }
@@ -82,15 +97,23 @@ class VibeBoardApp(App):
         ("q", "quit", "Quit"),
     ]
 
-    def __init__(self, root: Path, session_run_loader: Optional[SessionRunLoader] = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        session_run_loader: Optional[SessionRunLoader] = None,
+        session_focus_loader: Optional[SessionFocusLoader] = None,
+    ) -> None:
         super().__init__()
         self.root = root
         self.session_run_loader = session_run_loader or load_codex_run_states
+        self.session_focus_loader = session_focus_loader or load_codex_focus
         self.snapshot: Optional[Snapshot] = None
         self.selected_exp_id: Optional[str] = None
         self.selected_session_id: Optional[str] = None
         self.session_run_states: Dict[str, str] = {}
         self.session_run_ids: Sequence[str] = ()
+        self.session_focus_worker = None
+        self.session_focus_worker_id: Optional[str] = None
         self._experiment_has_active_run_cache: Dict[str, bool] = {}
         self.experiment_run_spinners: Dict[str, Spinner] = {}
         self.last_session_run_refresh = 0.0
@@ -109,6 +132,7 @@ class VibeBoardApp(App):
                 with Vertical(id="sessions-panel"):
                     yield Static("Sessions (0)", id="sessions-title")
                     yield DataTable(id="sessions", cursor_type="row")
+                    yield Static(self.codex_focus_placeholder(), id="codex-focus")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -183,7 +207,9 @@ class VibeBoardApp(App):
         if event.data_table.id == "sessions":
             experiment = self.selected_experiment()
             if experiment and any(session.id == row_key for session in experiment.sessions):
-                self.selected_session_id = row_key
+                if row_key != self.selected_session_id:
+                    self.selected_session_id = row_key
+                    self.start_session_focus_worker()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         row_key = row_key_value(event.row_key)
@@ -250,6 +276,7 @@ class VibeBoardApp(App):
         self.query_one("#details", Static).update(self.details_text(experiment))
         self.render_sessions(experiment)
         self.render_links(experiment)
+        self.start_session_focus_worker()
 
     def render_sessions(self, experiment: Optional[Experiment]) -> None:
         sessions = self.query_one("#sessions", DataTable)
@@ -259,12 +286,15 @@ class VibeBoardApp(App):
             self.selected_session_id = None
             sync_table_rows(sessions, (), ("id", "title", "run", "updated"))
             title.update("Sessions (0)")
+            self.render_codex_focus(unavailable_focus("", "No session selected."))
             return
 
         title.update("Sessions ({0})".format(len(experiment.sessions)))
         session_ids = {session.id for session in experiment.sessions}
         if self.selected_session_id not in session_ids:
             self.selected_session_id = experiment.sessions[0].id if experiment.sessions else None
+        if self.selected_session_id is None:
+            self.render_codex_focus(unavailable_focus("", "No session selected."))
 
         selected_row = 0
         now = datetime.now().astimezone()
@@ -319,6 +349,68 @@ class VibeBoardApp(App):
 
     def session_run_state(self, session: AgentSession) -> str:
         return self.session_run_states.get(session.id, UNKNOWN_RUN_STATE)
+
+    def start_session_focus_worker(self) -> None:
+        session = self.selected_session()
+        if session is None:
+            self.cancel_session_focus_worker()
+            self.render_codex_focus(unavailable_focus("", "No session selected."))
+            return
+        if (
+            self.session_focus_worker_id == session.id
+            and self.session_focus_worker is not None
+            and not self.session_focus_worker.is_finished
+        ):
+            return
+
+        self.cancel_session_focus_worker()
+        self.session_focus_worker_id = session.id
+        self.render_codex_focus(
+            CodexFocusSummary(
+                thread_id=session.id,
+                state=self.session_run_state(session),
+                focus="Loading Codex preview...",
+                phase="Reading visible session activity.",
+                available=True,
+            )
+        )
+        self.session_focus_worker = self.run_worker(
+            self.refresh_session_focus(session.id),
+            name="session-focus",
+            group="codex-focus",
+        )
+
+    def cancel_session_focus_worker(self) -> None:
+        if self.session_focus_worker is not None and not self.session_focus_worker.is_finished:
+            self.session_focus_worker.cancel()
+        self.session_focus_worker = None
+        self.session_focus_worker_id = None
+
+    async def refresh_session_focus(self, session_id: str) -> None:
+        while self.selected_session_id == session_id:
+            try:
+                summary = await asyncio.to_thread(self.session_focus_loader, session_id)
+            except Exception:
+                summary = unavailable_focus(session_id, "Codex preview unavailable.")
+            if self.selected_session_id != session_id:
+                return
+            self.render_codex_focus(summary)
+            if summary.state != UNKNOWN_RUN_STATE:
+                self.session_run_states[session_id] = summary.state
+                self._experiment_has_active_run_cache.clear()
+                self.render_experiment_run_indicators()
+            await asyncio.sleep(self.session_focus_refresh_seconds(summary))
+
+    def session_focus_refresh_seconds(self, summary: CodexFocusSummary) -> float:
+        if summary.state in self.ACTIVE_EXPERIMENT_RUN_STATES:
+            return self.CODEX_FOCUS_ACTIVE_REFRESH_SECONDS
+        return self.CODEX_FOCUS_IDLE_REFRESH_SECONDS
+
+    def render_codex_focus(self, summary: CodexFocusSummary) -> None:
+        self.query_one("#codex-focus", Static).update(summary.focus)
+
+    def codex_focus_placeholder(self) -> str:
+        return "Select a session to preview Codex."
 
     def experiment_has_active_run(self, experiment: Experiment) -> bool:
         if experiment.id not in self._experiment_has_active_run_cache:

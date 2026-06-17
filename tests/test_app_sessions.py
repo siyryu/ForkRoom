@@ -10,6 +10,7 @@ from rich.spinner import Spinner
 from textual.widgets import DataTable
 
 from vibe_board.app import VibeBoardApp
+from vibe_board.codex_focus import CodexFocusSummary
 
 
 def column_labels(table: DataTable) -> list[str]:
@@ -22,6 +23,18 @@ def row_values(table: DataTable, row: int) -> list[str]:
 
 def row_cells(table: DataTable, row: int) -> list[object]:
     return list(table.get_row_at(row))
+
+
+def make_focus_loader(state: str = "completed"):
+    def load_focus(session_id: str) -> CodexFocusSummary:
+        return CodexFocusSummary(
+            thread_id=session_id,
+            state=state,
+            focus="I am summarizing visible session activity.",
+            phase="summarizing visible activity",
+        )
+
+    return load_focus
 
 
 def write_experiment(root: Path, sessions: Optional[list[object]] = None) -> None:
@@ -55,13 +68,18 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 ],
             )
 
-            app = VibeBoardApp(root=root, session_run_loader=lambda ids: {session_id: "completed" for session_id in ids})
+            app = VibeBoardApp(
+                root=root,
+                session_run_loader=lambda ids: {session_id: "completed" for session_id in ids},
+                session_focus_loader=make_focus_loader("completed"),
+            )
             async with app.run_test() as pilot:
                 await pilot.pause(0.3)
                 experiments = app.query_one("#experiments", DataTable)
                 sessions = app.query_one("#sessions", DataTable)
                 links = app.query_one("#links", DataTable)
                 details_text = app.query_one("#details").render().plain
+                focus_text = app.query_one("#codex-focus").render().plain
 
                 self.assertEqual(experiments.row_count, 1)
                 self.assertEqual(sessions.row_count, 1)
@@ -69,6 +87,11 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(column_labels(sessions), ["ID", "Title", "Run", "Updated"])
                 self.assertEqual(row_values(sessions, 0)[2], "completed")
                 self.assertEqual(column_labels(links), ["Source", "Target", "Required", "Message", "Description"])
+                self.assertEqual(focus_text, "I am summarizing visible session activity.")
+                self.assertNotIn("State:", focus_text)
+                self.assertNotIn("Updated:", focus_text)
+                self.assertNotIn("Focus:", focus_text)
+                self.assertNotIn("Codex update:", focus_text)
                 self.assertNotIn("Status:", details_text)
                 self.assertNotIn("Git status:", details_text)
                 self.assertNotIn("Link status:", details_text)
@@ -89,7 +112,11 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
-            app = VibeBoardApp(root=root, session_run_loader=lambda ids: {"session-1": "active"})
+            app = VibeBoardApp(
+                root=root,
+                session_run_loader=lambda ids: {"session-1": "active"},
+                session_focus_loader=make_focus_loader("active"),
+            )
 
             async with app.run_test() as pilot:
                 await pilot.pause(0.3)
@@ -115,6 +142,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             app = VibeBoardApp(
                 root=root,
                 session_run_loader=lambda ids: {session_id: "active" for session_id in ids},
+                session_focus_loader=make_focus_loader("active"),
             )
 
             async with app.run_test() as pilot:
@@ -138,7 +166,11 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(run_state=run_state), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
-                app = VibeBoardApp(root=root, session_run_loader=lambda ids: {session_id: run_state for session_id in ids})
+                app = VibeBoardApp(
+                    root=root,
+                    session_run_loader=lambda ids: {session_id: run_state for session_id in ids},
+                    session_focus_loader=make_focus_loader(run_state),
+                )
 
                 async with app.run_test() as pilot:
                     await pilot.pause(0.3)
@@ -153,7 +185,11 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(run_state=run_state), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
-                app = VibeBoardApp(root=root, session_run_loader=lambda ids: {session_id: run_state for session_id in ids})
+                app = VibeBoardApp(
+                    root=root,
+                    session_run_loader=lambda ids: {session_id: run_state for session_id in ids},
+                    session_focus_loader=make_focus_loader(run_state),
+                )
 
                 async with app.run_test() as pilot:
                     await pilot.pause(0.3)
@@ -165,7 +201,11 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_experiment(root, sessions=None)
-            app = VibeBoardApp(root=root, session_run_loader=lambda ids: {session_id: "active" for session_id in ids})
+            app = VibeBoardApp(
+                root=root,
+                session_run_loader=lambda ids: {session_id: "active" for session_id in ids},
+                session_focus_loader=make_focus_loader("active"),
+            )
 
             async with app.run_test() as pilot:
                 await pilot.pause(0.3)

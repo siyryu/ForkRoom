@@ -12,9 +12,11 @@ vibe-board
 The dashboard refreshes automatically every two seconds. Press `r` to refresh on demand.
 Move the experiment cursor to inspect its details, symlink status, and recorded Codex sessions.
 Press `Enter` on an experiment to focus its sessions, then press `Enter` on a session to open its Codex deep link.
+When a session is highlighted, the preview panel shows Codex's latest visible update directly.
 Press `Esc` to return focus to the experiments table.
 
 The experiments table shows an animated indicator next to any experiment with a recorded session that is active or waiting on approval. The sessions table shows the specific `Run` state for each recorded Codex thread. Vibe Board queries the local Codex App Server and falls back to `unknown` if Codex is unavailable, times out, or cannot read a thread.
+The preview panel uses the same local App Server and shows visible session activity only; it does not expose command lines or replace opening the full Codex thread for details.
 
 Vibe Board resolves `codex` from `PATH`, then falls back to the macOS Codex.app bundle. Set `VIBE_BOARD_CODEX_BIN` to override the executable path.
 
