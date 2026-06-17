@@ -251,7 +251,7 @@ def timestamp_to_text(value: Any) -> str:
         return ""
 
 
-def summarize_text(text: str, limit: int = 140) -> str:
+def summarize_text(text: str, limit: int = 1000) -> str:
     cleaned = clean_text(text)
     if len(cleaned) <= limit:
         return cleaned
@@ -268,8 +268,7 @@ def sentence_case(text: str) -> str:
 def clean_text(text: str) -> str:
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     text = re.sub(r"<[^>]{1,80}>", " ", text)
-    text = re.sub(r"`[^`]{1,120}`", "details", text)
-    return " ".join(text.split())
+    return text.strip()
 
 
 def contains_any(text: str, needles: Sequence[str]) -> bool:

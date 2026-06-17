@@ -35,6 +35,21 @@ class VibeBoardApp(App):
         layout: vertical;
     }
 
+    Header, Footer, Footer > .footer--key, DataTable > .datatable--header {
+        background: $background;
+        color: $foreground;
+    }
+
+    HeaderIcon, HeaderTitle, HeaderClock {
+        background: $background;
+        color: $foreground;
+    }
+
+    DataTable > .datatable--cursor {
+        background: $foreground;
+        color: $background;
+    }
+
     #body {
         height: 1fr;
     }
@@ -42,7 +57,11 @@ class VibeBoardApp(App):
     #experiments-panel {
         width: 100%;
         height: 1fr;
-        border: solid $accent;
+        padding: 0 1;
+    }
+
+    #experiments-title {
+        padding: 1 0 1 1;
     }
 
     #lower-panels {
@@ -53,12 +72,12 @@ class VibeBoardApp(App):
     #details-panel {
         width: 2fr;
         height: 100%;
+        display: none;
     }
 
     #details {
         width: 100%;
         height: 1fr;
-        border: solid $accent;
         padding: 1 2;
         overflow-y: auto;
     }
@@ -66,13 +85,16 @@ class VibeBoardApp(App):
     #sessions-panel {
         width: 3fr;
         height: 100%;
-        border: solid $accent;
+        padding: 0 1;
+    }
+
+    #sessions-title {
+        padding: 1 0 1 1;
     }
 
     #links {
         width: 100%;
         height: 8;
-        border: solid $accent;
     }
 
     #sessions {
@@ -80,9 +102,10 @@ class VibeBoardApp(App):
     }
 
     #codex-focus {
-        height: 8;
-        border-top: solid $accent;
-        padding: 1 1 0 1;
+        height: 2fr;
+        background: $surface;
+        padding: 1 2;
+        margin-top: 1;
         overflow-y: auto;
     }
 
@@ -93,6 +116,7 @@ class VibeBoardApp(App):
 
     BINDINGS = [
         ("r", "refresh", "Refresh"),
+        ("i", "toggle_info", "Toggle Info"),
         ("escape", "focus_experiments", "Experiments"),
         ("q", "quit", "Quit"),
     ]
@@ -120,22 +144,23 @@ class VibeBoardApp(App):
         self.refresh_worker = None
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
+        yield Header(show_clock=True, classes="custom-header")
         with Vertical(id="body"):
             with Vertical(id="experiments-panel"):
-                yield Static("Experiments", id="experiments-title")
+                yield Static("EXPERIMENTS", id="experiments-title")
                 yield DataTable(id="experiments", cursor_type="row")
             with Horizontal(id="lower-panels"):
                 with Vertical(id="details-panel"):
-                    yield Static("Loading repository state...", id="details")
+                    yield Static("Scanning worktrees and experiments...", id="details")
                     yield DataTable(id="links")
                 with Vertical(id="sessions-panel"):
-                    yield Static("Sessions (0)", id="sessions-title")
+                    yield Static("SESSIONS (0)", id="sessions-title")
                     yield DataTable(id="sessions", cursor_type="row")
                     yield Static(self.codex_focus_placeholder(), id="codex-focus")
         yield Footer()
 
     def on_mount(self) -> None:
+        self.theme = "textual-dark"
         experiments = self.query_one("#experiments", DataTable)
         experiments.add_column("", width=4, key="run")
         experiments.add_column("ID", key="id")
@@ -150,6 +175,10 @@ class VibeBoardApp(App):
         self.set_interval(0.25, self.render_experiment_run_indicators, name="run-indicator-animation")
         self.action_refresh()
         experiments.focus()
+
+    def action_toggle_info(self) -> None:
+        panel = self.query_one("#details-panel")
+        panel.display = not panel.display
 
     def action_refresh(self) -> None:
         if self.refresh_worker is not None and not self.refresh_worker.is_finished:
@@ -285,11 +314,11 @@ class VibeBoardApp(App):
         if experiment is None:
             self.selected_session_id = None
             sync_table_rows(sessions, (), ("id", "title", "run", "updated"))
-            title.update("Sessions (0)")
+            title.update("SESSIONS (0)")
             self.render_codex_focus(unavailable_focus("", "No session selected."))
             return
 
-        title.update("Sessions ({0})".format(len(experiment.sessions)))
+        title.update("SESSIONS ({0})".format(len(experiment.sessions)))
         session_ids = {session.id for session in experiment.sessions}
         if self.selected_session_id not in session_ids:
             self.selected_session_id = experiment.sessions[0].id if experiment.sessions else None
@@ -410,7 +439,7 @@ class VibeBoardApp(App):
         self.query_one("#codex-focus", Static).update(summary.focus)
 
     def codex_focus_placeholder(self) -> str:
-        return "Select a session to preview Codex."
+        return "Select a session above to view live AI activity."
 
     def experiment_has_active_run(self, experiment: Experiment) -> bool:
         if experiment.id not in self._experiment_has_active_run_cache:
@@ -426,7 +455,7 @@ class VibeBoardApp(App):
             self.experiment_run_spinners.pop(experiment.id, None)
             return ""
         if experiment.id not in self.experiment_run_spinners:
-            self.experiment_run_spinners[experiment.id] = Spinner("dots", style="bold green")
+            self.experiment_run_spinners[experiment.id] = Spinner("dots")
         return Padding(self.experiment_run_spinners[experiment.id], (0, 0, 0, 1))
 
     def focus_sessions(self) -> None:
@@ -457,7 +486,7 @@ class VibeBoardApp(App):
         snapshot = self.snapshot
         now = datetime.now().astimezone()
         if snapshot is None:
-            return "Loading repository state..."
+            return "Scanning worktrees and experiments..."
 
         lines = [
             "Repository: {0}".format(snapshot.root),
