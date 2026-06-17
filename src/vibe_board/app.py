@@ -32,6 +32,8 @@ class VibeBoardApp(App):
     CODEX_RUN_REFRESH_SECONDS = 10.0
     CODEX_FOCUS_ACTIVE_REFRESH_SECONDS = 2.0
     CODEX_FOCUS_IDLE_REFRESH_SECONDS = 10.0
+    USER_COMMAND_PREVIEW_HEIGHT = 4
+    PREVIEW_TRUNCATION_MARKER = "..."
     ACTIVE_EXPERIMENT_RUN_STATES = {"active", "waiting"}
 
     CSS = """
@@ -530,10 +532,112 @@ class VibeBoardApp(App):
         return self.CODEX_FOCUS_IDLE_REFRESH_SECONDS
 
     def render_codex_focus(self, summary: CodexFocusSummary) -> None:
-        self.query_one("#codex-focus", Static).update(summary.focus)
+        focus = self.query_one("#codex-focus", Static)
+        focus.update(
+            self.codex_focus_text(
+                summary,
+                height=focus.content_size.height,
+                width=focus.content_size.width,
+            )
+        )
 
     def codex_focus_placeholder(self) -> str:
         return "Select a session above to view live AI activity."
+
+    def codex_focus_text(
+        self,
+        summary: CodexFocusSummary,
+        height: Optional[int] = None,
+        width: Optional[int] = None,
+    ) -> Text:
+        height = max(1, height or 1)
+        width = max(1, width or 1)
+        prompt = summary.last_user_command.strip()
+        if not prompt and not summary.codex_update and not summary.available:
+            return Text(summary.focus.strip() or self.codex_focus_placeholder(), style="dim")
+
+        codex_update = (summary.codex_update or summary.focus).strip()
+        if not prompt and not codex_update:
+            return Text(self.codex_focus_placeholder(), style="dim")
+
+        text = Text()
+        prompt_lines = []
+        if prompt:
+            prompt_budget = self.prompt_preview_height(height, has_codex_update=bool(codex_update))
+            prompt_lines = self.fit_wrapped_lines(prompt, prompt_budget, width)
+            text.append("\n".join(prompt_lines), style="bold")
+        if codex_update:
+            remaining_height = height - len(prompt_lines)
+            if remaining_height > 0:
+                if text and remaining_height >= 2:
+                    text.append("\n\n")
+                    remaining_height -= 1
+                elif text:
+                    text.append("\n")
+                text.append(self.codex_update_text(codex_update, remaining_height, width))
+        return text
+
+    def prompt_preview_height(self, total_height: int, has_codex_update: bool) -> int:
+        if not has_codex_update:
+            return min(self.USER_COMMAND_PREVIEW_HEIGHT, total_height)
+        if total_height <= 1:
+            return 1
+        reserved_for_codex = 2 if total_height >= 3 else 1
+        return min(self.USER_COMMAND_PREVIEW_HEIGHT, max(1, total_height - reserved_for_codex))
+
+    def fit_wrapped_lines(self, value: str, height: int, width: int) -> list[str]:
+        if height <= 0:
+            return []
+        lines = self.wrapped_lines(value, width)
+        if len(lines) <= height:
+            return lines
+        if height == 1:
+            return [self.PREVIEW_TRUNCATION_MARKER]
+        return lines[: height - 1] + [self.PREVIEW_TRUNCATION_MARKER]
+
+    def wrapped_lines(self, value: str, width: int) -> list[str]:
+        lines = []
+        for line in value.splitlines() or [""]:
+            if line:
+                wrapped = Text(line).wrap(self.console, max(1, width), overflow="fold")
+                lines.extend(wrapped_line.plain for wrapped_line in wrapped)
+            else:
+                lines.append("")
+        return lines
+
+    def codex_update_text(self, value: str, height: int, width: int) -> Text:
+        text = Text()
+        lines = self.fit_guided_codex_lines(value, height, width)
+        for index, (prefix, line) in enumerate(lines):
+            if index > 0:
+                text.append("\n")
+            text.append(prefix, style="dim")
+            text.append(line)
+        return text
+
+    def fit_guided_codex_lines(self, value: str, height: int, width: int) -> list[tuple[str, str]]:
+        if height <= 0:
+            return []
+        lines = self.guided_codex_lines(value, width)
+        if len(lines) <= height:
+            return lines
+        if height == 1:
+            return [("└─ ", self.PREVIEW_TRUNCATION_MARKER)]
+        return lines[: height - 1] + [("   ", self.PREVIEW_TRUNCATION_MARKER)]
+
+    def guided_codex_lines(self, value: str, width: int) -> list[tuple[str, str]]:
+        lines = []
+        text_width = max(1, width - 3)
+        for line in value.splitlines() or [""]:
+            if line:
+                wrapped = Text(line).wrap(self.console, text_width, overflow="fold")
+                parts = [wrapped_line.plain for wrapped_line in wrapped]
+            else:
+                parts = [""]
+            for part in parts:
+                prefix = "└─ " if not lines else "   "
+                lines.append((prefix, part))
+        return lines
 
     def experiment_has_active_run(self, experiment: Experiment) -> bool:
         if experiment.key not in self._experiment_has_active_run_cache:

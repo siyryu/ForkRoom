@@ -29,6 +29,8 @@ class CodexFocusSummary:
     phase: str
     updated_at: str = ""
     available: bool = True
+    last_user_command: str = ""
+    codex_update: str = ""
 
 
 def load_codex_focus(thread_id: str, timeout_seconds: float = 4.0) -> CodexFocusSummary:
@@ -116,7 +118,9 @@ def summarize_codex_focus(
             active_flags=active_flags,
         )
     )
-    focus = focus_from_activity(turns)
+    last_user_command = latest_user_command(turns)
+    codex_update = codex_update_from_activity(turns)
+    focus = render_focus(last_user_command, codex_update)
     phase = phase_from_activity(state, turn_status, active_flags, turn_error, latest_items)
     updated_at = updated_at_from_activity(thread, latest_turn)
     return CodexFocusSummary(
@@ -126,6 +130,8 @@ def summarize_codex_focus(
         phase=phase,
         updated_at=updated_at,
         available=True,
+        last_user_command=last_user_command,
+        codex_update=codex_update,
     )
 
 
@@ -140,9 +146,13 @@ def unavailable_focus(thread_id: str, focus: str = DEFAULT_FOCUS) -> CodexFocusS
 
 
 def focus_from_activity(turns: Sequence[Any]) -> str:
+    return render_focus(latest_user_command(turns), codex_update_from_activity(turns))
+
+
+def codex_update_from_activity(turns: Sequence[Any]) -> str:
     agent_text = latest_agent_text(turns)
     if agent_text:
-        return summarize_text(agent_text)
+        return agent_text
 
     latest_turn = mapping_value(turns[0]) if turns else {}
     item_phase = phase_from_items(list_value(latest_turn.get("items")))
@@ -150,6 +160,16 @@ def focus_from_activity(turns: Sequence[Any]) -> str:
         return sentence_case(item_phase) + "."
 
     return "No visible Codex update yet."
+
+
+def render_focus(last_user_command: str, codex_update: str) -> str:
+    command = clean_text(last_user_command)
+    update = clean_text(codex_update)
+    if command and update:
+        return "Last command:\n{0}\n\nCodex update:\n{1}".format(command, update)
+    if command:
+        return "Last command:\n{0}".format(command)
+    return update
 
 
 def phase_from_activity(
@@ -219,6 +239,44 @@ def latest_agent_text(turns: Sequence[Any]) -> str:
     return ""
 
 
+def latest_user_command(turns: Sequence[Any]) -> str:
+    for raw_turn in turns:
+        turn = mapping_value(raw_turn)
+        text = latest_user_command_from_items(list_value(turn.get("items")))
+        if text:
+            return text
+    return ""
+
+
+def latest_user_command_from_items(items: Sequence[Any]) -> str:
+    for item in reversed(items):
+        if not is_item_type(item, "userMessage"):
+            continue
+        text = user_message_text(mapping_value(item))
+        if text:
+            return text
+    return ""
+
+
+def user_message_text(item: Mapping[str, Any]) -> str:
+    direct_text = clean_text(string_value(item.get("text")))
+    if direct_text:
+        return direct_text
+
+    content = item.get("content")
+    if isinstance(content, str):
+        return clean_text(content)
+    parts = []
+    for part in list_value(content):
+        if isinstance(part, str):
+            text = clean_text(part)
+        else:
+            text = clean_text(string_value(mapping_value(part).get("text")))
+        if text:
+            parts.append(text)
+    return "\n".join(parts)
+
+
 def latest_agent_text_from_items(items: Sequence[Any]) -> str:
     for item in reversed(items):
         if not is_item_type(item, "agentMessage"):
@@ -249,13 +307,6 @@ def timestamp_to_text(value: Any) -> str:
         return datetime.fromtimestamp(value).astimezone().isoformat()
     except (OSError, OverflowError, ValueError):
         return ""
-
-
-def summarize_text(text: str, limit: int = 1000) -> str:
-    cleaned = clean_text(text)
-    if len(cleaned) <= limit:
-        return cleaned
-    return cleaned[: limit - 3].rstrip() + "..."
 
 
 def sentence_case(text: str) -> str:

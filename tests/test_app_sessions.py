@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from rich.padding import Padding
 from rich.spinner import Spinner
-from textual.widgets import DataTable
+from textual.widgets import DataTable, Static
 
 from vibe_board.app import VibeBoardApp
 from vibe_board.codex_focus import CodexFocusSummary
@@ -30,8 +30,15 @@ def make_focus_loader(state: str = "completed"):
         return CodexFocusSummary(
             thread_id=session_id,
             state=state,
-            focus="I am summarizing visible session activity.",
+            focus=(
+                "Last command:\n"
+                "Summarize visible session activity.\n\n"
+                "Codex update:\n"
+                "I am summarizing visible session activity."
+            ),
             phase="summarizing visible activity",
+            last_user_command="Summarize visible session activity.",
+            codex_update="I am summarizing visible session activity.",
         )
 
     return load_focus
@@ -90,7 +97,9 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 sessions = app.query_one("#sessions", DataTable)
                 links = app.query_one("#links", DataTable)
                 details_text = app.query_one("#details").render().plain
-                focus_text = app.query_one("#codex-focus").render().plain
+                focus_renderable = app.query_one("#codex-focus", Static).render()
+                focus_text = focus_renderable.plain
+                focus_styles = " ".join(str(span.style) for span in getattr(focus_renderable, "spans", []))
 
                 self.assertEqual(experiments.row_count, 1)
                 self.assertEqual(sessions.row_count, 1)
@@ -98,11 +107,17 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(column_labels(sessions), ["ID", "Title", "Run", "Updated"])
                 self.assertEqual(row_values(sessions, 0)[2], "completed")
                 self.assertEqual(column_labels(links), ["Source", "Target", "Required", "Message", "Description"])
-                self.assertEqual(focus_text, "I am summarizing visible session activity.")
+                self.assertEqual(
+                    focus_text,
+                    "Summarize visible session activity.\n\n"
+                    "└─ I am summarizing visible session activity.",
+                )
+                self.assertIn("bold", focus_styles)
+                self.assertNotIn("Codex update:", focus_text)
+                self.assertNotIn("Last command:", focus_text)
                 self.assertNotIn("State:", focus_text)
                 self.assertNotIn("Updated:", focus_text)
                 self.assertNotIn("Focus:", focus_text)
-                self.assertNotIn("Codex update:", focus_text)
                 self.assertNotIn("Status:", details_text)
                 self.assertNotIn("Git status:", details_text)
                 self.assertNotIn("Link status:", details_text)
@@ -118,6 +133,32 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                     await pilot.pause(0.2)
 
                 open_url.assert_called_once_with("codex://threads/019e7831-63b8-7ca2-a4f7-47593e2846ea")
+
+    async def test_codex_preview_fits_update_to_available_height(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = VibeBoardApp(root=root)
+            summary = CodexFocusSummary(
+                thread_id="session-1",
+                state="active",
+                focus="",
+                phase="implementing changes",
+                last_user_command="Review the preview.",
+                codex_update="\n".join("Codex line {0}".format(index) for index in range(1, 8)),
+            )
+
+            async with app.run_test():
+                focus_text = app.codex_focus_text(summary, height=6, width=80).plain
+
+            self.assertEqual(
+                focus_text,
+                "Review the preview.\n\n"
+                "└─ Codex line 1\n"
+                "   Codex line 2\n"
+                "   Codex line 3\n"
+                "   ...",
+            )
+            self.assertEqual(len(focus_text.splitlines()), 6)
 
     async def test_render_selection_keeps_session_rows_when_unchanged(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -221,8 +262,11 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 await pilot.pause(0.3)
                 experiments = app.query_one("#experiments", DataTable)
+                focus_text = app.query_one("#codex-focus", Static).render().plain
 
                 self.assertEqual(row_cells(experiments, 0)[0], "")
+                self.assertEqual(focus_text, "No session selected.")
+                self.assertNotIn("└─", focus_text)
 
     async def test_multi_project_table_shows_project_column_and_correct_details(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
