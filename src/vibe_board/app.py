@@ -300,12 +300,13 @@ class VibeBoardApp(App):
 
     def format_experiment_stats(self, experiment: Experiment) -> Text:
         parts = []
-        if experiment.plan_lines > 0:
-            parts.append(f"[dim]Plan: {experiment.plan_lines}L[/dim]")
 
         worktree_stat = self.worktree_stats.get(experiment.id, "")
         if worktree_stat:
             parts.append(worktree_stat)
+
+        if experiment.plan_lines > 0:
+            parts.append(f"[dim]Plan: {experiment.plan_lines}L[/dim]")
 
         if experiment.outputs_count > 0:
             parts.append(f"[dim]Outs: {experiment.outputs_count}[/dim]")
