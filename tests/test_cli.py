@@ -4,7 +4,7 @@ from helpers import init_repo, git
 import subprocess
 from pathlib import Path
 
-from vibe_board.cli import main
+from vibe_board.cli import build_tui_parser, main, resolve_tui_roots
 
 
 FIXED_TIME = "2026-06-15T10:00:00+08:00"
@@ -66,3 +66,21 @@ def test_cli_record_session_updates_manifest(tmp_path: Path, capsys) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["sessions"][0]["id"] == "thread-1"
     assert manifest["sessions"][0]["title"] == "CLI session"
+
+
+def test_tui_parser_defaults_to_current_root() -> None:
+    args = build_tui_parser().parse_args([])
+
+    assert args.root is None
+    assert resolve_tui_roots(args.root) == [Path(".").resolve()]
+
+
+def test_tui_parser_accepts_repeated_roots_and_dedupes(tmp_path: Path) -> None:
+    one = tmp_path / "one"
+    two = tmp_path / "two"
+    one.mkdir()
+    two.mkdir()
+
+    args = build_tui_parser().parse_args(["--root", str(one), "--root", str(two), "--root", str(one)])
+
+    assert resolve_tui_roots(args.root) == [one.resolve(), two.resolve()]

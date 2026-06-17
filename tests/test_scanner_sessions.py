@@ -3,7 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from vibe_board.scanner import codex_thread_deeplink, load_experiments, load_sessions
+from helpers import git, init_repo
+
+from vibe_board.scanner import codex_thread_deeplink, load_experiments, load_sessions, scan_repositories
 
 
 class ScannerSessionTests(unittest.TestCase):
@@ -114,6 +116,71 @@ class ScannerSessionTests(unittest.TestCase):
             )
 
         self.assertEqual([experiment.id for experiment in experiments], ["bravo", "charlie", "alpha"])
+
+    def test_scan_repositories_combines_projects_and_sorts_globally(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            root_a = init_repo(base / "a")
+            root_b = init_repo(base / "b")
+            self.write_experiment(root_a, "alpha", "2026-06-15T10:00:00+08:00")
+            self.write_experiment(root_b, "bravo", "2026-06-15T12:00:00+08:00")
+
+            snapshot = scan_repositories([root_a, root_b])
+
+        self.assertEqual([experiment.id for experiment in snapshot.experiments], ["bravo", "alpha"])
+        self.assertEqual([project.name for project in snapshot.projects], ["a/repo", "b/repo"])
+        self.assertEqual(snapshot.experiments[0].project_root, root_b.resolve())
+        self.assertEqual(snapshot.experiments[1].project_root, root_a.resolve())
+
+    def test_same_experiment_ids_across_projects_get_distinct_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            root_a = init_repo(base / "a")
+            root_b = init_repo(base / "b")
+            self.write_experiment(root_a, "demo", "2026-06-15T10:00:00+08:00")
+            self.write_experiment(root_b, "demo", "2026-06-15T11:00:00+08:00")
+
+            snapshot = scan_repositories([root_a, root_b])
+
+        self.assertEqual([experiment.id for experiment in snapshot.experiments], ["demo", "demo"])
+        self.assertEqual(len({experiment.key for experiment in snapshot.experiments}), 2)
+        self.assertTrue(all(experiment.key.endswith("/demo") for experiment in snapshot.experiments))
+
+    def test_cross_project_duplicate_session_warning_uses_project_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            root_a = init_repo(base / "a")
+            root_b = init_repo(base / "b")
+            self.write_experiment(root_a, "demo", "2026-06-15T10:00:00+08:00", sessions=[{"id": "shared-session"}])
+            self.write_experiment(root_b, "demo", "2026-06-15T11:00:00+08:00", sessions=[{"id": "shared-session"}])
+
+            snapshot = scan_repositories([root_a, root_b])
+
+        warnings = {experiment.project_name: "\n".join(experiment.warnings) for experiment in snapshot.experiments}
+        self.assertIn("b/repo/demo", warnings["a/repo"])
+        self.assertIn("a/repo/demo", warnings["b/repo"])
+
+    def write_experiment(
+        self,
+        root: Path,
+        exp_id: str,
+        updated_at: str,
+        sessions: list[object] | None = None,
+    ) -> None:
+        git(root, "branch", "agents/{0}".format(exp_id), "HEAD")
+        exp = root / ".agents" / "exps" / exp_id
+        (exp / "worktree").mkdir(parents=True)
+        (exp / "outputs").mkdir()
+        (exp / "logs").mkdir()
+        manifest: dict[str, object] = {
+            "id": exp_id,
+            "title": exp_id.title(),
+            "branch": "agents/{0}".format(exp_id),
+            "updated_at": updated_at,
+        }
+        if sessions is not None:
+            manifest["sessions"] = sessions
+        (exp / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
 
 if __name__ == "__main__":

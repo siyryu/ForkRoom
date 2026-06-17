@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -8,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 from urllib.parse import quote
 
-from .models import AgentSession, Experiment, LinkRule, LinkStatus, MapConfig, Snapshot
+from .models import AgentSession, Experiment, LinkRule, LinkStatus, MapConfig, ProjectSnapshot, Snapshot
 
 
 EXPS_DIR = Path(".agents") / "exps"
@@ -16,7 +17,41 @@ MAP_PATH = Path(".vibe-board") / "worktree-map.json"
 
 
 def scan_repository(root: Path) -> Snapshot:
-    root = root.resolve()
+    return scan_repositories([root])
+
+
+def scan_repositories(roots: Sequence[Path]) -> Snapshot:
+    resolved_roots = normalize_roots(roots)
+    project_names = project_display_names(resolved_roots)
+    with ThreadPoolExecutor(max_workers=max(1, min(8, len(resolved_roots)))) as executor:
+        futures = [
+            executor.submit(scan_project, root, project_key_for_root(root), project_names[root])
+            for root in resolved_roots
+        ]
+
+    projects: List[ProjectSnapshot] = []
+    experiments: List[Experiment] = []
+    for future in futures:
+        project, project_experiments = future.result()
+        projects.append(project)
+        experiments.extend(project_experiments)
+
+    experiments.sort(key=experiment_updated_sort_key)
+    experiments = with_session_ownership_warnings(experiments)
+    primary = projects[0]
+    return Snapshot(
+        root=primary.root,
+        exps_path=primary.exps_path,
+        map_config=primary.map_config,
+        experiments=experiments,
+        git_error=primary.git_error,
+        roots=resolved_roots,
+        projects=projects,
+    )
+
+
+def scan_project(root: Path, project_key: str, project_name: str) -> Tuple[ProjectSnapshot, List[Experiment]]:
+    root = root.expanduser().resolve(strict=False)
     with ThreadPoolExecutor(max_workers=3) as executor:
         map_future = executor.submit(load_map_config, root)
         worktrees_future = executor.submit(load_registered_worktrees, root)
@@ -25,14 +60,64 @@ def scan_repository(root: Path) -> Snapshot:
     map_config = map_future.result()
     registered_worktrees, git_error = worktrees_future.result()
     branches = branches_future.result() if git_error is None else set()
-    experiments = load_experiments(root, map_config.links, registered_worktrees, branches)
-    return Snapshot(
+    project = ProjectSnapshot(
+        key=project_key,
+        name=project_name,
         root=root,
         exps_path=root / EXPS_DIR,
         map_config=map_config,
-        experiments=experiments,
         git_error=git_error,
     )
+    experiments = load_experiments(
+        root,
+        map_config.links,
+        registered_worktrees,
+        branches,
+        project_key=project_key,
+        project_name=project_name,
+        include_session_ownership_warnings=False,
+    )
+    return project, experiments
+
+
+def normalize_roots(roots: Sequence[Path]) -> List[Path]:
+    requested_roots = list(roots) or [Path(".")]
+    normalized: List[Path] = []
+    seen: Set[Path] = set()
+    for root in requested_roots:
+        resolved = root.expanduser().resolve(strict=False)
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        normalized.append(resolved)
+    return normalized
+
+
+def project_key_for_root(root: Path) -> str:
+    return hashlib.sha1(str(root).encode("utf-8")).hexdigest()[:12]
+
+
+def project_display_names(roots: Sequence[Path]) -> Dict[Path, str]:
+    groups: Dict[str, List[Path]] = {}
+    for root in roots:
+        groups.setdefault(root.name or str(root), []).append(root)
+
+    names: Dict[Path, str] = {}
+    for basename, group in groups.items():
+        if len(group) == 1:
+            names[group[0]] = basename
+            continue
+        names.update(shortest_unique_suffixes(group))
+    return names
+
+
+def shortest_unique_suffixes(roots: Sequence[Path]) -> Dict[Path, str]:
+    max_len = max(len(root.parts) for root in roots)
+    for length in range(1, max_len + 1):
+        candidates = {root: "/".join(root.parts[-length:]) or str(root) for root in roots}
+        if len(set(candidates.values())) == len(roots):
+            return candidates
+    return {root: str(root) for root in roots}
 
 
 def load_map_config(root: Path) -> MapConfig:
@@ -87,16 +172,33 @@ def load_experiments(
     links: Sequence[LinkRule],
     registered_worktrees: Set[Path],
     branches: Set[str],
+    project_key: str = "",
+    project_name: str = "",
+    include_session_ownership_warnings: bool = True,
 ) -> List[Experiment]:
     exps_path = root / EXPS_DIR
     if not exps_path.exists():
         return []
 
+    project_key = project_key or project_key_for_root(root.resolve(strict=False))
+    project_name = project_name or root.resolve(strict=False).name or str(root.resolve(strict=False))
     experiments: List[Experiment] = []
     for exp_path in (path for path in exps_path.iterdir() if path.is_dir()):
-        experiments.append(load_experiment(root, exp_path, links, registered_worktrees, branches))
+        experiments.append(
+            load_experiment(
+                root,
+                exp_path,
+                links,
+                registered_worktrees,
+                branches,
+                project_key=project_key,
+                project_name=project_name,
+            )
+        )
     experiments.sort(key=experiment_updated_sort_key)
-    return with_session_ownership_warnings(experiments)
+    if include_session_ownership_warnings:
+        return with_session_ownership_warnings(experiments)
+    return experiments
 
 
 def experiment_updated_sort_key(experiment: Experiment) -> Tuple[bool, float, str]:
@@ -110,6 +212,8 @@ def load_experiment(
     links: Sequence[LinkRule],
     registered_worktrees: Set[Path],
     branches: Set[str],
+    project_key: str,
+    project_name: str,
 ) -> Experiment:
     exp_id = exp_path.name
     manifest_path = exp_path / "manifest.json"
@@ -151,6 +255,10 @@ def load_experiment(
     logs_count = count_visible_files(exp_path / "logs")
 
     return Experiment(
+        key="{0}/{1}".format(project_key, exp_id),
+        project_key=project_key,
+        project_name=project_name,
+        project_root=root,
         id=exp_id,
         title=title,
         status=status,
@@ -263,33 +371,45 @@ def codex_thread_deeplink(session_id: str) -> str:
 
 
 def with_session_ownership_warnings(experiments: List[Experiment]) -> List[Experiment]:
-    owners: Dict[str, List[str]] = {}
+    owners: Dict[str, Dict[str, Experiment]] = {}
     for experiment in experiments:
         for session in experiment.sessions:
-            owners.setdefault(session.id, []).append(experiment.id)
+            owners.setdefault(session.id, {})[experiment.key] = experiment
 
     duplicate_owners = {
-        session_id: sorted(set(exp_ids))
-        for session_id, exp_ids in owners.items()
-        if len(set(exp_ids)) > 1
+        session_id: owner_map
+        for session_id, owner_map in owners.items()
+        if len(owner_map) > 1
     }
     if not duplicate_owners:
         return experiments
 
+    use_project_labels = len({experiment.project_key for experiment in experiments}) > 1
     updated: List[Experiment] = []
     for experiment in experiments:
         warnings = list(experiment.warnings)
         for session in experiment.sessions:
-            exp_ids = duplicate_owners.get(session.id)
-            if exp_ids:
+            owner_map = duplicate_owners.get(session.id)
+            if owner_map:
+                other_labels = sorted(
+                    experiment_owner_label(owner, use_project_labels)
+                    for key, owner in owner_map.items()
+                    if key != experiment.key
+                )
                 warnings.append(
                     "session {0} is also recorded by experiment(s): {1}; a session can only belong to one experiment".format(
                         session.id,
-                        ", ".join(exp_id for exp_id in exp_ids if exp_id != experiment.id),
+                        ", ".join(other_labels),
                     )
                 )
         updated.append(replace(experiment, warnings=warnings))
     return updated
+
+
+def experiment_owner_label(experiment: Experiment, use_project_label: bool) -> str:
+    if not use_project_label:
+        return experiment.id
+    return "{0}/{1}".format(experiment.project_name, experiment.id)
 
 
 def inspect_link(root: Path, worktree_path: Path, resolved_root: Path, resolved_worktree: Path, rule: LinkRule) -> LinkStatus:

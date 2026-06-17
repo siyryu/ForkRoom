@@ -26,8 +26,9 @@ def build_tui_parser(prog: str = "vibe-board") -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--root",
-        default=".",
-        help="Repository root to inspect. Defaults to the current directory.",
+        action="append",
+        default=None,
+        help="Repository root to inspect. May be provided multiple times. Defaults to the current directory.",
     )
     return parser
 
@@ -48,6 +49,19 @@ def main(argv: Optional[Sequence[str]] = None) -> Optional[int]:
 
 def run_tui(argv: Sequence[str], prog: str) -> None:
     args = build_tui_parser(prog=prog).parse_args(argv)
-    app = VibeBoardApp(root=Path(args.root).expanduser().resolve())
+    app = VibeBoardApp(roots=resolve_tui_roots(args.root))
     app.run()
     return None
+
+
+def resolve_tui_roots(raw_roots: Optional[Sequence[str]]) -> Sequence[Path]:
+    roots = raw_roots or ["."]
+    resolved_roots = []
+    seen = set()
+    for root in roots:
+        resolved = Path(root).expanduser().resolve(strict=False)
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        resolved_roots.append(resolved)
+    return resolved_roots

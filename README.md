@@ -26,6 +26,14 @@ Or point it at a repository:
 vibe-board --root /path/to/repo
 ```
 
+Or preview experiments across multiple repositories in one board:
+
+```bash
+vibe-board --root /path/to/repo-a --root /path/to/repo-b
+```
+
+When multiple roots are provided, Vibe Board merges experiments into one table, adds a `Project` column, and sorts the combined list by most recently updated experiment.
+
 The TUI does not create experiments, worktrees, symlinks, commits, or handoffs. Those workflows are handled by CLI subcommands and the `skills/vibe-board` skill.
 
 Create an experiment with the deterministic initializer:
@@ -76,5 +84,7 @@ vibe-board record-session \
 ```
 
 The command appends or updates the session in `.agents/exps/<exp-id>/manifest.json`, fills default metadata, derives the Codex deeplink when omitted, and rejects session ids already owned by another experiment.
+
+`vibe-board init` and `vibe-board record-session` intentionally operate on one `--root` at a time, even though the TUI can preview multiple roots.
 
 The legacy `python3 scripts/init_experiment.py` and `python3 scripts/record_session.py` entry points remain as compatibility wrappers when working from the Vibe Board source tree.

@@ -17,8 +17,8 @@ from textual.widgets import DataTable, Footer, Header, Static
 
 from .codex_focus import CodexFocusSummary, load_codex_focus, unavailable_focus
 from .codex_status import UNKNOWN_RUN_STATE, load_codex_run_states
-from .models import AgentSession, Experiment, Snapshot
-from .scanner import scan_repository
+from .models import AgentSession, Experiment, ProjectSnapshot, Snapshot
+from .scanner import normalize_roots, scan_repositories
 from .time_format import friendly_time
 
 SessionRunLoader = Callable[[Sequence[str]], Mapping[str, str]]
@@ -130,16 +130,19 @@ class VibeBoardApp(App):
 
     def __init__(
         self,
-        root: Path,
+        root: Optional[Path] = None,
+        roots: Optional[Sequence[Path]] = None,
         session_run_loader: Optional[SessionRunLoader] = None,
         session_focus_loader: Optional[SessionFocusLoader] = None,
     ) -> None:
         super().__init__()
-        self.root = root
+        self.roots = tuple(normalize_roots(roots or ([root] if root is not None else [Path(".")])))
+        self.root = self.roots[0]
+        self.show_project_column = len(self.roots) > 1
         self.session_run_loader = session_run_loader or load_codex_run_states
         self.session_focus_loader = session_focus_loader or load_codex_focus
         self.snapshot: Optional[Snapshot] = None
-        self.selected_exp_id: Optional[str] = None
+        self.selected_exp_key: Optional[str] = None
         self.selected_session_id: Optional[str] = None
         self.session_run_states: Dict[str, str] = {}
         self.session_run_ids: Sequence[str] = ()
@@ -171,6 +174,8 @@ class VibeBoardApp(App):
         self.theme = "textual-dark"
         experiments = self.query_one("#experiments", DataTable)
         experiments.add_column("", width=4, key="run")
+        if self.show_project_column:
+            experiments.add_column("Project", key="project")
         experiments.add_column("Title", key="title")
         experiments.add_column("Branch", key="branch")
         experiments.add_column("Updated", key="updated")
@@ -226,10 +231,10 @@ class VibeBoardApp(App):
             focused.action_scroll_up()
 
     async def refresh_snapshot(self) -> None:
-        snapshot = await asyncio.to_thread(scan_repository, self.root)
+        snapshot = await asyncio.to_thread(scan_repositories, self.roots)
         self.snapshot = snapshot
-        if self.selected_exp_id not in {experiment.id for experiment in snapshot.experiments}:
-            self.selected_exp_id = snapshot.experiments[0].id if snapshot.experiments else None
+        if self.selected_exp_key not in {experiment.key for experiment in snapshot.experiments}:
+            self.selected_exp_key = snapshot.experiments[0].key if snapshot.experiments else None
         self.render_snapshot()
         await asyncio.gather(
             self.refresh_session_run_states(snapshot),
@@ -270,9 +275,9 @@ class VibeBoardApp(App):
         if row_key != current_cursor_row_key(event.data_table):
             return
         if event.data_table.id == "experiments":
-            if self.snapshot and any(experiment.id == row_key for experiment in self.snapshot.experiments):
-                if row_key != self.selected_exp_id:
-                    self.selected_exp_id = row_key
+            if self.snapshot and any(experiment.key == row_key for experiment in self.snapshot.experiments):
+                if row_key != self.selected_exp_key:
+                    self.selected_exp_key = row_key
                     self.selected_session_id = None
                     self.render_selection()
             return
@@ -286,7 +291,7 @@ class VibeBoardApp(App):
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         row_key = row_key_value(event.row_key)
         if event.data_table.id == "experiments":
-            self.selected_exp_id = row_key
+            self.selected_exp_key = row_key
             self.render_selection()
             self.focus_sessions()
             return
@@ -301,7 +306,7 @@ class VibeBoardApp(App):
     def format_experiment_stats(self, experiment: Experiment) -> Text:
         parts = []
 
-        worktree_stat = self.worktree_stats.get(experiment.id, "")
+        worktree_stat = self.worktree_stats.get(experiment.key, "")
         if worktree_stat:
             parts.append(worktree_stat)
 
@@ -322,24 +327,30 @@ class VibeBoardApp(App):
 
         table = self.query_one("#experiments", DataTable)
         table.clear()
-        experiment_ids = {experiment.id for experiment in self.snapshot.experiments}
+        experiment_keys = {experiment.key for experiment in self.snapshot.experiments}
         self.experiment_run_spinners = {
-            exp_id: spinner
-            for exp_id, spinner in self.experiment_run_spinners.items()
-            if exp_id in experiment_ids
+            exp_key: spinner
+            for exp_key, spinner in self.experiment_run_spinners.items()
+            if exp_key in experiment_keys
         }
         selected_row = 0
         now = datetime.now().astimezone()
         for index, experiment in enumerate(self.snapshot.experiments):
-            table.add_row(
+            row_values = [
                 self.experiment_run_indicator(experiment),
-                experiment.title,
-                Text(experiment.branch, style="dim"),
-                Text(friendly_time(experiment.updated_at, now=now), style="dim"),
-                self.format_experiment_stats(experiment),
-                key=experiment.id,
+            ]
+            if self.show_project_column:
+                row_values.append(experiment.project_name)
+            row_values.extend(
+                [
+                    experiment.title,
+                    Text(experiment.branch, style="dim"),
+                    Text(friendly_time(experiment.updated_at, now=now), style="dim"),
+                    self.format_experiment_stats(experiment),
+                ]
             )
-            if experiment.id == self.selected_exp_id:
+            table.add_row(*row_values, key=experiment.key)
+            if experiment.key == self.selected_exp_key:
                 selected_row = index
         if self.snapshot.experiments:
             table.move_cursor(row=selected_row, column=0, animate=False)
@@ -352,7 +363,7 @@ class VibeBoardApp(App):
         table = self.query_one("#experiments", DataTable)
         for experiment in self.snapshot.experiments:
             table.update_cell(
-                experiment.id,
+                experiment.key,
                 "run",
                 self.experiment_run_indicator(experiment),
                 update_width=False,
@@ -413,7 +424,7 @@ class VibeBoardApp(App):
         links.clear()
 
         if experiment is None:
-            rules = self.snapshot.map_config.links if self.snapshot else []
+            rules = self.snapshot.map_config.links if self.snapshot and not self.show_project_column else []
             for rule in rules:
                 links.add_row(rule.source, rule.target, str(rule.required), "", rule.description)
             return
@@ -428,9 +439,14 @@ class VibeBoardApp(App):
             )
 
     def selected_experiment(self) -> Optional[Experiment]:
-        if self.snapshot is None or self.selected_exp_id is None:
+        if self.snapshot is None or self.selected_exp_key is None:
             return None
-        return next((e for e in self.snapshot.experiments if e.id == self.selected_exp_id), None)
+        return next((e for e in self.snapshot.experiments if e.key == self.selected_exp_key), None)
+
+    def project_for_experiment(self, experiment: Experiment) -> Optional[ProjectSnapshot]:
+        if self.snapshot is None:
+            return None
+        return next((project for project in self.snapshot.projects if project.key == experiment.project_key), None)
 
     def selected_session(self) -> Optional[AgentSession]:
         experiment = self.selected_experiment()
@@ -504,21 +520,21 @@ class VibeBoardApp(App):
         return "Select a session above to view live AI activity."
 
     def experiment_has_active_run(self, experiment: Experiment) -> bool:
-        if experiment.id not in self._experiment_has_active_run_cache:
-            self._experiment_has_active_run_cache[experiment.id] = any(
+        if experiment.key not in self._experiment_has_active_run_cache:
+            self._experiment_has_active_run_cache[experiment.key] = any(
                 self.session_run_state(session) in self.ACTIVE_EXPERIMENT_RUN_STATES
                 for session in experiment.sessions
             )
-        return self._experiment_has_active_run_cache[experiment.id]
+        return self._experiment_has_active_run_cache[experiment.key]
 
 
     def experiment_run_indicator(self, experiment: Experiment) -> object:
         if not self.experiment_has_active_run(experiment):
-            self.experiment_run_spinners.pop(experiment.id, None)
+            self.experiment_run_spinners.pop(experiment.key, None)
             return ""
-        if experiment.id not in self.experiment_run_spinners:
-            self.experiment_run_spinners[experiment.id] = Spinner("dots")
-        return Padding(self.experiment_run_spinners[experiment.id], (0, 0, 0, 1))
+        if experiment.key not in self.experiment_run_spinners:
+            self.experiment_run_spinners[experiment.key] = Spinner("dots")
+        return Padding(self.experiment_run_spinners[experiment.key], (0, 0, 0, 1))
 
     def focus_sessions(self) -> None:
         experiment = self.selected_experiment()
@@ -550,25 +566,53 @@ class VibeBoardApp(App):
         if snapshot is None:
             return "Scanning worktrees and experiments..."
 
-        lines = [
-            "Repository: {0}".format(snapshot.root),
-            "Experiments: {0}".format(snapshot.exps_path),
-            "Map config: {0}".format(snapshot.map_config.path),
-        ]
-        if snapshot.git_error:
-            lines.append("Git error: {0}".format(snapshot.git_error))
-        if snapshot.map_config.error:
-            lines.append("Map config error: {0}".format(snapshot.map_config.error))
-        if not snapshot.map_config.exists:
-            lines.append("Map config: missing")
+        if self.show_project_column:
+            lines = [
+                "Projects: {0}".format(len(snapshot.projects)),
+                "Experiments: {0}".format(len(snapshot.experiments)),
+            ]
         else:
-            lines.append("Map links: {0}".format(len(snapshot.map_config.links)))
+            lines = [
+                "Repository: {0}".format(snapshot.root),
+                "Experiments: {0}".format(snapshot.exps_path),
+                "Map config: {0}".format(snapshot.map_config.path),
+            ]
+            if snapshot.git_error:
+                lines.append("Git error: {0}".format(snapshot.git_error))
+            if snapshot.map_config.error:
+                lines.append("Map config error: {0}".format(snapshot.map_config.error))
+            if not snapshot.map_config.exists:
+                lines.append("Map config: missing")
+            else:
+                lines.append("Map links: {0}".format(len(snapshot.map_config.links)))
 
         if experiment is None:
             lines.extend(["", "No experiment selected."])
             if not snapshot.experiments:
                 lines.append("No experiments found under .agents/exps.")
+                if self.show_project_column:
+                    for project in snapshot.projects:
+                        lines.append("- {0}: {1}".format(project.name, project.exps_path))
             return "\n".join(lines)
+
+        project = self.project_for_experiment(experiment)
+        if self.show_project_column and project is not None:
+            lines.extend(
+                [
+                    "Project: {0}".format(project.name),
+                    "Repository: {0}".format(project.root),
+                    "Project experiments: {0}".format(project.exps_path),
+                    "Map config: {0}".format(project.map_config.path),
+                ]
+            )
+            if project.git_error:
+                lines.append("Git error: {0}".format(project.git_error))
+            if project.map_config.error:
+                lines.append("Map config error: {0}".format(project.map_config.error))
+            if not project.map_config.exists:
+                lines.append("Map config: missing")
+            else:
+                lines.append("Map links: {0}".format(len(project.map_config.links)))
 
         lines.extend(
             [
@@ -602,7 +646,7 @@ class VibeBoardApp(App):
     async def refresh_worktree_stats(self, snapshot: Snapshot) -> None:
         async def fetch_stat(experiment: Experiment) -> Tuple[str, str]:
             if not experiment.worktree_exists:
-                return experiment.id, ""
+                return experiment.key, ""
 
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -626,7 +670,7 @@ class VibeBoardApp(App):
                         parts.append(f"[green]+ {ins}[/green]")
                     if dels != "0":
                         parts.append(f"[red]- {dels}[/red]")
-                    return experiment.id, " ".join(parts)
+                    return experiment.key, " ".join(parts)
                 else:
                     proc2 = await asyncio.create_subprocess_exec(
                         "git", "-C", str(experiment.worktree_path), "status", "--porcelain",
@@ -635,16 +679,16 @@ class VibeBoardApp(App):
                     stdout2, _ = await proc2.communicate()
                     untracked = len(stdout2.decode("utf-8").strip().splitlines())
                     if untracked > 0:
-                        return experiment.id, f"∑ {untracked} (untracked)"
-                    return experiment.id, ""
+                        return experiment.key, f"∑ {untracked} (untracked)"
+                    return experiment.key, ""
             except Exception:
-                return experiment.id, ""
+                return experiment.key, ""
 
         results = await asyncio.gather(*(fetch_stat(exp) for exp in snapshot.experiments))
         changed = False
-        for exp_id, stat in results:
-            if self.worktree_stats.get(exp_id) != stat:
-                self.worktree_stats[exp_id] = stat
+        for exp_key, stat in results:
+            if self.worktree_stats.get(exp_key) != stat:
+                self.worktree_stats[exp_key] = stat
                 changed = True
 
         if changed:
@@ -656,7 +700,7 @@ class VibeBoardApp(App):
         table = self.query_one("#experiments", DataTable)
         for exp in self.snapshot.experiments:
             try:
-                table.update_cell(exp.id, "stats", self.format_experiment_stats(exp), update_width=True)
+                table.update_cell(exp.key, "stats", self.format_experiment_stats(exp), update_width=True)
             except Exception:
                 pass
 

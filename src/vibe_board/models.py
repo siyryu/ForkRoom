@@ -45,6 +45,10 @@ class MapConfig:
 
 @dataclass(frozen=True)
 class Experiment:
+    key: str
+    project_key: str
+    project_name: str
+    project_root: Path
     id: str
     title: str
     status: str
@@ -71,9 +75,21 @@ class Experiment:
 
 
 @dataclass(frozen=True)
+class ProjectSnapshot:
+    key: str
+    name: str
+    root: Path
+    exps_path: Path
+    map_config: MapConfig
+    git_error: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class Snapshot:
     root: Path
     exps_path: Path
     map_config: MapConfig
     experiments: List[Experiment]
     git_error: Optional[str] = None
+    roots: List[Path] = field(default_factory=list)
+    projects: List[ProjectSnapshot] = field(default_factory=list)

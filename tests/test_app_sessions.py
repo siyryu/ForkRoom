@@ -37,21 +37,32 @@ def make_focus_loader(state: str = "completed"):
     return load_focus
 
 
-def write_experiment(root: Path, sessions: Optional[list[object]] = None) -> None:
-    exp = root / ".agents" / "exps" / "demo"
+def write_experiment(
+    root: Path,
+    sessions: Optional[list[object]] = None,
+    exp_id: str = "demo",
+    updated_at: str = "",
+) -> None:
+    exp = root / ".agents" / "exps" / exp_id
     (exp / "worktree").mkdir(parents=True)
     (exp / "outputs").mkdir()
     (exp / "logs").mkdir()
     (exp / "plan.md").write_text("# Plan\n", encoding="utf-8")
     manifest: dict[str, object] = {
-        "id": "demo",
-        "title": "Demo",
+        "id": exp_id,
+        "title": exp_id.title(),
         "status": "running",
-        "branch": "agents/demo",
+        "branch": "agents/{0}".format(exp_id),
     }
+    if updated_at:
+        manifest["updated_at"] = updated_at
     if sessions is not None:
         manifest["sessions"] = sessions
     (exp / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def table_row_keys(table: DataTable) -> list[str]:
+    return [str(getattr(row.key, "value", row.key)) for row in table.ordered_rows]
 
 
 class AppSessionTests(unittest.IsolatedAsyncioTestCase):
@@ -83,7 +94,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertEqual(experiments.row_count, 1)
                 self.assertEqual(sessions.row_count, 1)
-                self.assertEqual(column_labels(experiments), ["", "ID", "Title", "Branch", "Updated"])
+                self.assertEqual(column_labels(experiments), ["", "Title", "Branch", "Updated", "Stats"])
                 self.assertEqual(column_labels(sessions), ["ID", "Title", "Run", "Updated"])
                 self.assertEqual(row_values(sessions, 0)[2], "completed")
                 self.assertEqual(column_labels(links), ["Source", "Target", "Required", "Message", "Description"])
@@ -212,3 +223,71 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 experiments = app.query_one("#experiments", DataTable)
 
                 self.assertEqual(row_cells(experiments, 0)[0], "")
+
+    async def test_multi_project_table_shows_project_column_and_correct_details(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root_a = Path(tmp) / "alpha"
+            root_b = Path(tmp) / "beta"
+            write_experiment(root_a, sessions=[{"id": "session-a"}], updated_at="2026-06-15T10:00:00+08:00")
+            write_experiment(root_b, sessions=[{"id": "session-b"}], updated_at="2026-06-15T12:00:00+08:00")
+            app = VibeBoardApp(
+                roots=[root_a, root_b],
+                session_run_loader=lambda ids: {session_id: "completed" for session_id in ids},
+                session_focus_loader=make_focus_loader("completed"),
+            )
+
+            async with app.run_test() as pilot:
+                await pilot.pause(0.3)
+                experiments = app.query_one("#experiments", DataTable)
+                details_text = app.query_one("#details").render().plain
+
+                self.assertEqual(column_labels(experiments), ["", "Project", "Title", "Branch", "Updated", "Stats"])
+                self.assertEqual(experiments.row_count, 2)
+                self.assertEqual(row_values(experiments, 0)[1], "beta")
+                self.assertIn("Projects: 2", details_text)
+                self.assertIn("Project: beta", details_text)
+                self.assertIn("Repository: {0}".format(root_b.resolve()), details_text)
+
+    async def test_multi_project_duplicate_experiment_ids_have_distinct_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root_a = Path(tmp) / "alpha"
+            root_b = Path(tmp) / "beta"
+            write_experiment(root_a, sessions=[{"id": "session-a"}], updated_at="2026-06-15T10:00:00+08:00")
+            write_experiment(root_b, sessions=[{"id": "session-b"}], updated_at="2026-06-15T11:00:00+08:00")
+            app = VibeBoardApp(
+                roots=[root_a, root_b],
+                session_run_loader=lambda ids: {session_id: "active" for session_id in ids},
+                session_focus_loader=make_focus_loader("active"),
+            )
+
+            async with app.run_test() as pilot:
+                await pilot.pause(0.3)
+                experiments = app.query_one("#experiments", DataTable)
+
+                keys = table_row_keys(experiments)
+                self.assertEqual(len(keys), 2)
+                self.assertEqual(len(set(keys)), 2)
+                self.assertEqual([row_values(experiments, row)[2] for row in range(2)], ["Demo", "Demo"])
+
+    async def test_multi_project_session_run_loader_receives_deduped_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root_a = Path(tmp) / "alpha"
+            root_b = Path(tmp) / "beta"
+            write_experiment(root_a, sessions=[{"id": "shared-session"}], updated_at="2026-06-15T10:00:00+08:00")
+            write_experiment(root_b, sessions=[{"id": "shared-session"}], updated_at="2026-06-15T11:00:00+08:00")
+            loaded_ids: list[tuple[str, ...]] = []
+
+            def load_runs(ids):
+                loaded_ids.append(tuple(ids))
+                return {session_id: "completed" for session_id in ids}
+
+            app = VibeBoardApp(
+                roots=[root_a, root_b],
+                session_run_loader=load_runs,
+                session_focus_loader=make_focus_loader("completed"),
+            )
+
+            async with app.run_test() as pilot:
+                await pilot.pause(0.3)
+
+            self.assertIn(("shared-session",), loaded_ids)
