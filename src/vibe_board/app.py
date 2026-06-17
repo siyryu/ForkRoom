@@ -638,11 +638,11 @@ class VibeBoardApp(App):
                     ins = ins_match.group(1) if ins_match else "0"
                     dels = del_match.group(1) if del_match else "0"
 
-                    parts = [f"📄 {files}"]
+                    parts = [f"□ {files}"]
                     if ins != "0":
-                        parts.append(f"+{ins}")
+                        parts.append(f"△ {ins}")
                     if dels != "0":
-                        parts.append(f"-{dels}")
+                        parts.append(f"▽ {dels}")
 
                     sections.append("[bold]worktree[/bold]\n" + "  ".join(parts))
                 else:
@@ -652,7 +652,7 @@ class VibeBoardApp(App):
                     )
                     untracked = len(res2.stdout.strip().splitlines())
                     if untracked > 0:
-                        sections.append(f"[bold]worktree[/bold]\n📄 {untracked} (untracked)")
+                        sections.append(f"[bold]worktree[/bold]\n□ {untracked} (untracked)")
             except Exception:
                 pass
 
