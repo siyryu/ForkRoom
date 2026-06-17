@@ -145,6 +145,11 @@ def load_experiment(
     resolved_worktree = worktree_path.resolve(strict=False)
     link_statuses = [inspect_link(root, worktree_path, resolved_root, resolved_worktree, rule) for rule in links]
 
+    plan_summary, plan_lines = read_plan_summary_and_lines(exp_path / "plan.md")
+
+    outputs_count = count_visible_files(exp_path / "outputs")
+    logs_count = count_visible_files(exp_path / "logs")
+
     return Experiment(
         id=exp_id,
         title=title,
@@ -159,7 +164,10 @@ def load_experiment(
         worktree_exists=worktree_exists,
         worktree_registered=worktree_registered,
         branch_exists=branch_exists,
-        plan_summary=read_plan_summary(exp_path / "plan.md"),
+        plan_summary=plan_summary,
+        plan_lines=plan_lines,
+        outputs_count=outputs_count,
+        logs_count=logs_count,
         handoff_exists=(exp_path / "handoff.md").exists(),
         outputs_exists=(exp_path / "outputs").is_dir(),
         logs_exists=(exp_path / "logs").is_dir(),
@@ -334,19 +342,28 @@ def load_manifest(path: Path) -> Tuple[Dict[str, Any], Optional[str]]:
     return raw, None
 
 
-def read_plan_summary(path: Path) -> str:
+def read_plan_summary_and_lines(path: Path) -> Tuple[str, int]:
     if not path.exists():
-        return "plan.md is missing"
+        return "plan.md is missing", 0
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except Exception as exc:
-        return "plan.md could not be read: {0}".format(exc)
+        return "plan.md could not be read: {0}".format(exc), 0
 
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if not lines:
-        return "plan.md is empty"
-    summary = " ".join(lines[:4])
-    return summary[:600]
+    lines = [line.strip() for line in text.splitlines()]
+    non_empty_lines = [line for line in lines if line]
+    if not non_empty_lines:
+        return "plan.md is empty", len(lines)
+    summary = " ".join(non_empty_lines[:4])
+    return summary[:600], len(lines)
+
+def count_visible_files(path: Path) -> int:
+    if not path.exists() or not path.is_dir():
+        return 0
+    try:
+        return len([f for f in path.iterdir() if f.is_file() and not f.name.startswith(".")])
+    except Exception:
+        return 0
 
 
 def load_registered_worktrees(root: Path) -> Tuple[Set[Path], Optional[str]]:

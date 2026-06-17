@@ -59,6 +59,9 @@ class Experiment:
     worktree_registered: bool
     branch_exists: bool
     plan_summary: str
+    plan_lines: int
+    outputs_count: int
+    logs_count: int
     handoff_exists: bool
     outputs_exists: bool
     logs_exists: bool

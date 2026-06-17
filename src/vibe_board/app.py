@@ -86,23 +86,6 @@ class VibeBoardApp(App):
         overflow-y: auto;
     }
 
-    #exp-info-panel {
-        width: 1fr;
-        height: 100%;
-        padding: 0 1;
-        border-right: solid $surface;
-    }
-
-    #exp-info-title {
-        padding: 1 0 1 1;
-        color: $text-muted;
-    }
-
-    #exp-info-content {
-        padding: 0 1;
-        overflow-y: auto;
-    }
-
     #sessions-panel {
         width: 3fr;
         height: 100%;
@@ -164,6 +147,7 @@ class VibeBoardApp(App):
         self.session_focus_worker_id: Optional[str] = None
         self._experiment_has_active_run_cache: Dict[str, bool] = {}
         self.experiment_run_spinners: Dict[str, Spinner] = {}
+        self.worktree_stats: Dict[str, str] = {}
         self.last_session_run_refresh = 0.0
         self.refresh_worker = None
 
@@ -177,9 +161,6 @@ class VibeBoardApp(App):
                 with Vertical(id="details-panel"):
                     yield Static("Scanning worktrees and experiments...", id="details")
                     yield DataTable(id="links")
-                with Vertical(id="exp-info-panel"):
-                    yield Static("INFO", id="exp-info-title")
-                    yield Static("", id="exp-info-content")
                 with Vertical(id="sessions-panel"):
                     yield Static("SESSIONS (0)", id="sessions-title")
                     yield DataTable(id="sessions", cursor_type="row")
@@ -191,6 +172,10 @@ class VibeBoardApp(App):
         experiments = self.query_one("#experiments", DataTable)
         experiments.add_column("", width=4, key="run")
         experiments.add_column("Title", key="title")
+        experiments.add_column("Plan", key="plan")
+        experiments.add_column("Worktree", key="worktree")
+        experiments.add_column("Outs", key="outs")
+        experiments.add_column("Logs", key="logs")
         experiments.add_column("Branch", key="branch")
         experiments.add_column("Updated", key="updated")
         sessions = self.query_one("#sessions", DataTable)
@@ -249,7 +234,10 @@ class VibeBoardApp(App):
         if self.selected_exp_id not in {experiment.id for experiment in snapshot.experiments}:
             self.selected_exp_id = snapshot.experiments[0].id if snapshot.experiments else None
         self.render_snapshot()
-        await self.refresh_session_run_states(snapshot)
+        await asyncio.gather(
+            self.refresh_session_run_states(snapshot),
+            self.refresh_worktree_stats(snapshot)
+        )
         self.render_selection()
 
     async def refresh_session_run_states(self, snapshot: Snapshot) -> None:
@@ -331,6 +319,10 @@ class VibeBoardApp(App):
             table.add_row(
                 self.experiment_run_indicator(experiment),
                 experiment.title,
+                Text(f"{experiment.plan_lines}L", style="dim") if experiment.plan_lines > 0 else Text(""),
+                Text.from_markup(self.worktree_stats.get(experiment.id, "")),
+                Text(str(experiment.outputs_count), style="dim") if experiment.outputs_count > 0 else Text(""),
+                Text(str(experiment.logs_count), style="dim") if experiment.logs_count > 0 else Text(""),
                 Text(experiment.branch, style="dim"),
                 Text(friendly_time(experiment.updated_at, now=now), style="dim"),
                 key=experiment.id,
@@ -360,14 +352,6 @@ class VibeBoardApp(App):
 
         experiment = self.selected_experiment()
         self.query_one("#details", Static).update(self.details_text(experiment))
-
-        info_text = self.exp_info_text(experiment)
-        info_panel = self.query_one("#exp-info-panel")
-        if info_text:
-            info_panel.display = True
-            self.query_one("#exp-info-content", Static).update(info_text)
-        else:
-            info_panel.display = False
 
         self.render_sessions(experiment)
         self.render_links(experiment)
@@ -603,32 +587,19 @@ class VibeBoardApp(App):
             lines.extend("- {0}".format(warning) for warning in experiment.warnings)
         return "\n".join(lines)
 
-    def exp_info_text(self, experiment: Optional[Experiment]) -> str:
-        if experiment is None:
-            return ""
+    async def refresh_worktree_stats(self, snapshot: Snapshot) -> None:
+        async def fetch_stat(experiment: Experiment) -> Tuple[str, str]:
+            if not experiment.worktree_exists:
+                return experiment.id, ""
 
-        sections = []
-        exp_path = experiment.path
-        worktree_path = experiment.worktree_path
-
-        # plan.md
-        plan_file = exp_path / "plan.md"
-        if plan_file.exists():
             try:
-                lines = sum(1 for _ in plan_file.open("r", encoding="utf-8"))
-                if lines > 0:
-                    sections.append(f"[bold]plan.md[/bold] {lines} lines")
-            except Exception:
-                pass
-
-        # worktree
-        if worktree_path and worktree_path.exists():
-            try:
-                res = subprocess.run(
-                    ["git", "-C", str(worktree_path), "diff", "HEAD", "--shortstat"],
-                    capture_output=True, text=True, check=False
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "-C", str(experiment.worktree_path), "diff", "HEAD", "--shortstat",
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
                 )
-                stat = res.stdout.strip()
+                stdout, _ = await proc.communicate()
+                stat = stdout.decode("utf-8").strip()
+
                 if stat:
                     files_match = re.search(r'(\d+)\s+file', stat)
                     ins_match = re.search(r'(\d+)\s+insertion', stat)
@@ -643,36 +614,39 @@ class VibeBoardApp(App):
                         parts.append(f"[green]+ {ins}[/green]")
                     if dels != "0":
                         parts.append(f"[red]- {dels}[/red]")
-
-                    sections.append("[bold]worktree[/bold]\n" + "  ".join(parts))
+                    return experiment.id, " ".join(parts)
                 else:
-                    res2 = subprocess.run(
-                        ["git", "-C", str(worktree_path), "status", "--porcelain"],
-                        capture_output=True, text=True, check=False
+                    proc2 = await asyncio.create_subprocess_exec(
+                        "git", "-C", str(experiment.worktree_path), "status", "--porcelain",
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE
                     )
-                    untracked = len(res2.stdout.strip().splitlines())
+                    stdout2, _ = await proc2.communicate()
+                    untracked = len(stdout2.decode("utf-8").strip().splitlines())
                     if untracked > 0:
-                        sections.append(f"[bold]worktree[/bold]\n∑ {untracked} (untracked)")
+                        return experiment.id, f"∑ {untracked} (untracked)"
+                    return experiment.id, ""
+            except Exception:
+                return experiment.id, ""
+
+        results = await asyncio.gather(*(fetch_stat(exp) for exp in snapshot.experiments))
+        changed = False
+        for exp_id, stat in results:
+            if self.worktree_stats.get(exp_id) != stat:
+                self.worktree_stats[exp_id] = stat
+                changed = True
+
+        if changed:
+            self.render_worktree_stats()
+
+    def render_worktree_stats(self) -> None:
+        if self.snapshot is None:
+            return
+        table = self.query_one("#experiments", DataTable)
+        for exp in self.snapshot.experiments:
+            try:
+                table.update_cell(exp.id, "worktree", Text.from_markup(self.worktree_stats.get(exp.id, "")), update_width=True)
             except Exception:
                 pass
-
-        # outputs/
-        outputs_dir = exp_path / "outputs"
-        if outputs_dir.exists() and outputs_dir.is_dir():
-            files = [f.name for f in outputs_dir.iterdir() if f.is_file() and not f.name.startswith(".")]
-            if files:
-                lines = ["[bold]outputs/[/bold]"] + [f"  {f}" for f in sorted(files)]
-                sections.append("\n".join(lines))
-
-        # logs/
-        logs_dir = exp_path / "logs"
-        if logs_dir.exists() and logs_dir.is_dir():
-            files = [f.name for f in logs_dir.iterdir() if f.is_file() and not f.name.startswith(".")]
-            if files:
-                lines = ["[bold]logs/[/bold]"] + [f"  {f}" for f in sorted(files)]
-                sections.append("\n".join(lines))
-
-        return "\n\n".join(sections)
 
 def row_key_value(row_key: object) -> str:
     return str(getattr(row_key, "value", row_key))
