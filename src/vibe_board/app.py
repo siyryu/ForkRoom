@@ -7,6 +7,7 @@ from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple
 
 from rich.padding import Padding
 from rich.spinner import Spinner
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -167,7 +168,6 @@ class VibeBoardApp(App):
         self.theme = "textual-dark"
         experiments = self.query_one("#experiments", DataTable)
         experiments.add_column("", width=4, key="run")
-        experiments.add_column("ID", key="id")
         experiments.add_column("Title", key="title")
         experiments.add_column("Branch", key="branch")
         experiments.add_column("Updated", key="updated")
@@ -308,10 +308,9 @@ class VibeBoardApp(App):
         for index, experiment in enumerate(self.snapshot.experiments):
             table.add_row(
                 self.experiment_run_indicator(experiment),
-                experiment.id,
                 experiment.title,
-                experiment.branch,
-                friendly_time(experiment.updated_at, now=now),
+                Text(experiment.branch, style="dim"),
+                Text(friendly_time(experiment.updated_at, now=now), style="dim"),
                 key=experiment.id,
             )
             if experiment.id == self.selected_exp_id:
