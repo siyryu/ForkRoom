@@ -123,6 +123,7 @@ class VibeBoardApp(App):
         ("i", "toggle_info", "Toggle Info"),
         ("escape", "focus_experiments", "Experiments"),
         ("o", "open_experiment", "Open in Zed"),
+        ("c", "copy_info", "Copy Info"),
         Binding("j", "vim_down", "Down", show=False),
         Binding("k", "vim_up", "Up", show=False),
         ("q", "quit", "Quit"),
@@ -210,6 +211,21 @@ class VibeBoardApp(App):
             self.notify(f"Opened {path.name} in Zed.", severity="information")
         except Exception as exc:
             self.notify(f"Failed to open in Zed: {exc}", severity="error")
+
+    def action_copy_info(self) -> None:
+        experiment = self.selected_experiment()
+        if experiment is None:
+            self.notify("No experiment selected.", severity="warning")
+            return
+
+        info = (
+            f"Experiment: {experiment.id}\n"
+            f"Branch: {experiment.branch}\n"
+            f"Worktree: {experiment.worktree_path.resolve()}\n"
+            f"Command: cd {experiment.worktree_path.resolve()}"
+        )
+        self.app.copy_to_clipboard(info)
+        self.notify(f"Copied info for {experiment.id}", severity="information")
 
     def action_refresh(self) -> None:
         if self.refresh_worker is not None and not self.refresh_worker.is_finished:
