@@ -1,4 +1,5 @@
 import asyncio
+import re
 import time
 import subprocess
 from datetime import datetime
@@ -359,7 +360,15 @@ class VibeBoardApp(App):
 
         experiment = self.selected_experiment()
         self.query_one("#details", Static).update(self.details_text(experiment))
-        self.query_one("#exp-info-content", Static).update(self.exp_info_text(experiment))
+
+        info_text = self.exp_info_text(experiment)
+        info_panel = self.query_one("#exp-info-panel")
+        if info_text:
+            info_panel.display = True
+            self.query_one("#exp-info-content", Static).update(info_text)
+        else:
+            info_panel.display = False
+
         self.render_sessions(experiment)
         self.render_links(experiment)
         self.start_session_focus_worker()
@@ -596,9 +605,9 @@ class VibeBoardApp(App):
 
     def exp_info_text(self, experiment: Optional[Experiment]) -> str:
         if experiment is None:
-            return "No experiment selected."
+            return ""
 
-        content = []
+        sections = []
         exp_path = experiment.path
         worktree_path = experiment.worktree_path
 
@@ -607,11 +616,10 @@ class VibeBoardApp(App):
         if plan_file.exists():
             try:
                 lines = sum(1 for _ in plan_file.open("r", encoding="utf-8"))
-                content.append(f"[bold]plan.md[/bold] {lines} lines")
+                if lines > 0:
+                    sections.append(f"[bold]plan.md[/bold] {lines} lines")
             except Exception:
-                content.append("[bold]plan.md[/bold] error reading")
-        else:
-            content.append("[bold]plan.md[/bold] not found")
+                pass
 
         # worktree
         if worktree_path and worktree_path.exists():
@@ -621,46 +629,50 @@ class VibeBoardApp(App):
                     capture_output=True, text=True, check=False
                 )
                 stat = res.stdout.strip()
-                if not stat:
+                if stat:
+                    files_match = re.search(r'(\d+)\s+file', stat)
+                    ins_match = re.search(r'(\d+)\s+insertion', stat)
+                    del_match = re.search(r'(\d+)\s+deletion', stat)
+
+                    files = files_match.group(1) if files_match else "0"
+                    ins = ins_match.group(1) if ins_match else "0"
+                    dels = del_match.group(1) if del_match else "0"
+
+                    parts = [f"📄 {files}"]
+                    if ins != "0":
+                        parts.append(f"+{ins}")
+                    if dels != "0":
+                        parts.append(f"-{dels}")
+
+                    sections.append("[bold]worktree[/bold]\n" + "  ".join(parts))
+                else:
                     res2 = subprocess.run(
                         ["git", "-C", str(worktree_path), "status", "--porcelain"],
                         capture_output=True, text=True, check=False
                     )
                     untracked = len(res2.stdout.strip().splitlines())
-                    stat = f"{untracked} untracked files" if untracked > 0 else "clean"
-                content.append(f"\n[bold]worktree[/bold]\n{stat}")
+                    if untracked > 0:
+                        sections.append(f"[bold]worktree[/bold]\n📄 {untracked} (untracked)")
             except Exception:
-                content.append("\n[bold]worktree[/bold]\nerror")
-        else:
-            content.append("\n[bold]worktree[/bold]\nmissing")
+                pass
 
         # outputs/
         outputs_dir = exp_path / "outputs"
         if outputs_dir.exists() and outputs_dir.is_dir():
             files = [f.name for f in outputs_dir.iterdir() if f.is_file() and not f.name.startswith(".")]
             if files:
-                content.append("\n[bold]outputs/[/bold]")
-                for f in sorted(files):
-                    content.append(f"  {f}")
-            else:
-                content.append("\n[bold]outputs/[/bold]\n  (empty)")
-        else:
-            content.append("\n[bold]outputs/[/bold]\n  (missing)")
+                lines = ["[bold]outputs/[/bold]"] + [f"  {f}" for f in sorted(files)]
+                sections.append("\n".join(lines))
 
         # logs/
         logs_dir = exp_path / "logs"
         if logs_dir.exists() and logs_dir.is_dir():
             files = [f.name for f in logs_dir.iterdir() if f.is_file() and not f.name.startswith(".")]
             if files:
-                content.append("\n[bold]logs/[/bold]")
-                for f in sorted(files):
-                    content.append(f"  {f}")
-            else:
-                content.append("\n[bold]logs/[/bold]\n  (empty)")
-        else:
-            content.append("\n[bold]logs/[/bold]\n  (missing)")
+                lines = ["[bold]logs/[/bold]"] + [f"  {f}" for f in sorted(files)]
+                sections.append("\n".join(lines))
 
-        return "\n".join(content)
+        return "\n\n".join(sections)
 
 def row_key_value(row_key: object) -> str:
     return str(getattr(row_key, "value", row_key))
