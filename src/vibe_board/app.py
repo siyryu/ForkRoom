@@ -118,6 +118,7 @@ class VibeBoardApp(App):
         ("r", "refresh", "Refresh"),
         ("i", "toggle_info", "Toggle Info"),
         ("escape", "focus_experiments", "Experiments"),
+        ("o", "open_experiment", "Open in Zed"),
         ("q", "quit", "Quit"),
     ]
 
@@ -179,6 +180,24 @@ class VibeBoardApp(App):
     def action_toggle_info(self) -> None:
         panel = self.query_one("#details-panel")
         panel.display = not panel.display
+
+    def action_open_experiment(self) -> None:
+        experiment = self.selected_experiment()
+        if experiment is None:
+            self.notify("No experiment selected.", severity="warning")
+            return
+        self.run_worker(self._open_in_zed(experiment.path), name="open-zed", group="open", exclusive=True)
+
+    async def _open_in_zed(self, path: Path) -> None:
+        try:
+            if not path.exists():
+                self.notify("Experiment path does not exist.", severity="error")
+                return
+            process = await asyncio.create_subprocess_exec("zed", str(path))
+            await process.wait()
+            self.notify(f"Opened {path.name} in Zed.", severity="information")
+        except Exception as exc:
+            self.notify(f"Failed to open in Zed: {exc}", severity="error")
 
     def action_refresh(self) -> None:
         if self.refresh_worker is not None and not self.refresh_worker.is_finished:
