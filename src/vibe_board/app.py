@@ -172,12 +172,9 @@ class VibeBoardApp(App):
         experiments = self.query_one("#experiments", DataTable)
         experiments.add_column("", width=4, key="run")
         experiments.add_column("Title", key="title")
-        experiments.add_column("Plan", key="plan")
-        experiments.add_column("Worktree", key="worktree")
-        experiments.add_column("Outs", key="outs")
-        experiments.add_column("Logs", key="logs")
         experiments.add_column("Branch", key="branch")
         experiments.add_column("Updated", key="updated")
+        experiments.add_column("Stats", key="stats")
         sessions = self.query_one("#sessions", DataTable)
         sessions.add_columns(("ID", "id"), ("Title", "title"), ("Run", "run"), ("Updated", "updated"))
         links = self.query_one("#links", DataTable)
@@ -301,6 +298,23 @@ class VibeBoardApp(App):
                 return
             self.run_worker(self.open_session_deeplink(session), name="open-session", group="open", exclusive=True)
 
+    def format_experiment_stats(self, experiment: Experiment) -> Text:
+        parts = []
+        if experiment.plan_lines > 0:
+            parts.append(f"[dim]Plan: {experiment.plan_lines}L[/dim]")
+
+        worktree_stat = self.worktree_stats.get(experiment.id, "")
+        if worktree_stat:
+            parts.append(worktree_stat)
+
+        if experiment.outputs_count > 0:
+            parts.append(f"[dim]Outs: {experiment.outputs_count}[/dim]")
+
+        if experiment.logs_count > 0:
+            parts.append(f"[dim]Logs: {experiment.logs_count}[/dim]")
+
+        return Text.from_markup("  ".join(parts))
+
     def render_snapshot(self) -> None:
         if self.snapshot is None:
             return
@@ -319,12 +333,9 @@ class VibeBoardApp(App):
             table.add_row(
                 self.experiment_run_indicator(experiment),
                 experiment.title,
-                Text(f"{experiment.plan_lines}L", style="dim") if experiment.plan_lines > 0 else Text(""),
-                Text.from_markup(self.worktree_stats.get(experiment.id, "")),
-                Text(str(experiment.outputs_count), style="dim") if experiment.outputs_count > 0 else Text(""),
-                Text(str(experiment.logs_count), style="dim") if experiment.logs_count > 0 else Text(""),
                 Text(experiment.branch, style="dim"),
                 Text(friendly_time(experiment.updated_at, now=now), style="dim"),
+                self.format_experiment_stats(experiment),
                 key=experiment.id,
             )
             if experiment.id == self.selected_exp_id:
@@ -644,7 +655,7 @@ class VibeBoardApp(App):
         table = self.query_one("#experiments", DataTable)
         for exp in self.snapshot.experiments:
             try:
-                table.update_cell(exp.id, "worktree", Text.from_markup(self.worktree_stats.get(exp.id, "")), update_width=True)
+                table.update_cell(exp.id, "stats", self.format_experiment_stats(exp), update_width=True)
             except Exception:
                 pass
 
