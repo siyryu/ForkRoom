@@ -8,6 +8,7 @@ from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple
 from rich.padding import Padding
 from rich.spinner import Spinner
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Footer, Header, Static
 
@@ -119,6 +120,8 @@ class VibeBoardApp(App):
         ("i", "toggle_info", "Toggle Info"),
         ("escape", "focus_experiments", "Experiments"),
         ("o", "open_experiment", "Open in Zed"),
+        Binding("j", "vim_down", "Down", show=False),
+        Binding("k", "vim_up", "Up", show=False),
         ("q", "quit", "Quit"),
     ]
 
@@ -203,6 +206,20 @@ class VibeBoardApp(App):
         if self.refresh_worker is not None and not self.refresh_worker.is_finished:
             return
         self.refresh_worker = self.run_worker(self.refresh_snapshot(), name="refresh", group="scan", exclusive=True)
+
+    def action_vim_down(self) -> None:
+        focused = self.focused
+        if hasattr(focused, "action_cursor_down"):
+            focused.action_cursor_down()
+        elif hasattr(focused, "action_scroll_down"):
+            focused.action_scroll_down()
+
+    def action_vim_up(self) -> None:
+        focused = self.focused
+        if hasattr(focused, "action_cursor_up"):
+            focused.action_cursor_up()
+        elif hasattr(focused, "action_scroll_up"):
+            focused.action_scroll_up()
 
     async def refresh_snapshot(self) -> None:
         snapshot = await asyncio.to_thread(scan_repository, self.root)
