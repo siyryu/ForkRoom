@@ -55,6 +55,10 @@ class VibeBoardApp(App):
         color: $background;
     }
 
+    DataTable > .datatable--hover {
+        background: transparent;
+    }
+
     #body {
         height: 1fr;
     }
