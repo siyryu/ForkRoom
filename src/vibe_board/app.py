@@ -24,6 +24,16 @@ from .time_format import friendly_time
 
 
 
+class NoHoverDataTable(DataTable):
+    def on_mouse_move(self, event) -> None:
+        pass
+
+    def _set_hover_cursor(self, active: bool) -> None:
+        self._show_hover_cursor = False
+
+    def _update_hover_cursor(self) -> None:
+        self._show_hover_cursor = False
+
 class VibeBoardApp(App):
     """Read-only dashboard for worktree-backed experiments."""
 
@@ -45,10 +55,7 @@ class VibeBoardApp(App):
         color: $foreground;
     }
 
-    DataTable > .datatable--header-hover {
-        background: $background;
-        color: $foreground;
-    }
+
 
     HeaderIcon, HeaderTitle, HeaderClock {
         background: $background;
@@ -61,9 +68,7 @@ class VibeBoardApp(App):
         text-style: none;
     }
 
-    DataTable > .datatable--hover {
-        background: transparent;
-    }
+
 
     #body {
         height: 1fr;
@@ -176,21 +181,27 @@ class VibeBoardApp(App):
         with Vertical(id="body"):
             with Vertical(id="experiments-panel"):
                 yield Static("EXPERIMENTS", id="experiments-title")
-                yield DataTable(id="experiments", cursor_type="row")
+                yield NoHoverDataTable(id="experiments", cursor_type="row")
             with Horizontal(id="lower-panels"):
                 with Vertical(id="details-panel"):
                     yield Static("Scanning worktrees and experiments...", id="details")
-                    yield DataTable(id="links")
+                    yield NoHoverDataTable(id="links")
                 with Vertical(id="sessions-panel"):
                     yield Static("SESSIONS (0)", id="sessions-title")
                     with Horizontal(id="sessions-content"):
-                        yield DataTable(id="sessions", cursor_type="row")
+                        yield NoHoverDataTable(id="sessions", cursor_type="row")
                         yield Static(self.codex_focus_placeholder(), id="codex-focus")
         yield Footer()
 
     def on_mount(self) -> None:
         self.theme = "textual-dark"
-        experiments = self.query_one("#experiments", DataTable)
+
+        # Disable hover effects on data tables from the python side if possible
+        # Or at least configure them to not react to hover
+
+        experiments = self.query_one("#experiments", NoHoverDataTable)
+        experiments.cursor_type = "row"
+        experiments._set_hover_cursor(False)
         experiments.add_column("", width=4, key="run")
         if self.show_project_column:
             experiments.add_column("Project", key="project")
@@ -198,9 +209,12 @@ class VibeBoardApp(App):
         experiments.add_column("Branch", key="branch")
         experiments.add_column("Updated", key="updated")
         experiments.add_column("Stats", key="stats")
-        sessions = self.query_one("#sessions", DataTable)
+        sessions = self.query_one("#sessions", NoHoverDataTable)
+        sessions.cursor_type = "row"
+        sessions._set_hover_cursor(False)
         sessions.add_columns(("Title", "title"), ("Run", "run"), ("Updated", "updated"))
-        links = self.query_one("#links", DataTable)
+        links = self.query_one("#links", NoHoverDataTable)
+        links._set_hover_cursor(False)
         links.add_columns("Source", "Target", "Required", "Message", "Description")
         self.set_interval(self.AUTO_REFRESH_SECONDS, self.action_refresh, name="auto-refresh")
         self.set_interval(0.25, self.render_experiment_run_indicators, name="run-indicator-animation")
@@ -304,6 +318,8 @@ class VibeBoardApp(App):
         return time.monotonic() - self.last_session_run_refresh >= self.CODEX_RUN_REFRESH_SECONDS
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        if hasattr(event.data_table, "_set_hover_cursor"):
+            event.data_table._set_hover_cursor(False)
         row_key = row_key_value(event.row_key)
         if row_key != current_cursor_row_key(event.data_table):
             return
@@ -366,7 +382,7 @@ class VibeBoardApp(App):
         if self.snapshot is None:
             return
 
-        table = self.query_one("#experiments", DataTable)
+        table = self.query_one("#experiments", NoHoverDataTable)
         table.clear()
         experiment_keys = {experiment.key for experiment in self.snapshot.experiments}
         self.experiment_run_spinners = {
@@ -401,7 +417,7 @@ class VibeBoardApp(App):
         if self.snapshot is None:
             return
 
-        table = self.query_one("#experiments", DataTable)
+        table = self.query_one("#experiments", NoHoverDataTable)
         for experiment in self.snapshot.experiments:
             table.update_cell(
                 experiment.key,
@@ -422,7 +438,7 @@ class VibeBoardApp(App):
         self.start_session_focus_worker()
 
     def render_sessions(self, experiment: Optional[Experiment]) -> None:
-        sessions = self.query_one("#sessions", DataTable)
+        sessions = self.query_one("#sessions", NoHoverDataTable)
         title = self.query_one("#sessions-title", Static)
 
         if experiment is None:
@@ -460,7 +476,7 @@ class VibeBoardApp(App):
             move_table_cursor(sessions, selected_row)
 
     def render_links(self, experiment: Optional[Experiment]) -> None:
-        links = self.query_one("#links", DataTable)
+        links = self.query_one("#links", NoHoverDataTable)
         links.clear()
 
         if experiment is None:
@@ -686,10 +702,10 @@ class VibeBoardApp(App):
         if not experiment.sessions:
             self.notify("No sessions recorded for {0}.".format(experiment.id), severity="warning")
             return
-        self.query_one("#sessions", DataTable).focus()
+        self.query_one("#sessions", NoHoverDataTable).focus()
 
     def action_focus_experiments(self) -> None:
-        self.query_one("#experiments", DataTable).focus()
+        self.query_one("#experiments", NoHoverDataTable).focus()
 
     async def open_session_deeplink(self, session: AgentSession) -> None:
         try:
@@ -839,7 +855,7 @@ class VibeBoardApp(App):
     def render_worktree_stats(self) -> None:
         if self.snapshot is None:
             return
-        table = self.query_one("#experiments", DataTable)
+        table = self.query_one("#experiments", NoHoverDataTable)
         for exp in self.snapshot.experiments:
             try:
                 table.update_cell(exp.key, "stats", self.format_experiment_stats(exp), update_width=True)
