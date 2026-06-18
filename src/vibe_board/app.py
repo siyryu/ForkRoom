@@ -45,6 +45,11 @@ class VibeBoardApp(App):
         color: $foreground;
     }
 
+    DataTable > .datatable--header-hover {
+        background: $background;
+        color: $foreground;
+    }
+
     HeaderIcon, HeaderTitle, HeaderClock {
         background: $background;
         color: $foreground;
@@ -53,6 +58,7 @@ class VibeBoardApp(App):
     DataTable > .datatable--cursor {
         background: $foreground;
         color: $background;
+        text-style: none;
     }
 
     DataTable > .datatable--hover {
@@ -335,18 +341,26 @@ class VibeBoardApp(App):
 
         worktree_stat = self.worktree_stats.get(experiment.key, "")
         if worktree_stat:
-            parts.append(worktree_stat)
+            parts.append(Text.from_markup(worktree_stat))
 
         if experiment.plan_lines > 0:
-            parts.append(f"[dim]Plan: {experiment.plan_lines}L[/dim]")
+            parts.append(Text.from_markup(f"[dim]Plan: {experiment.plan_lines}L[/dim]"))
 
         if experiment.outputs_count > 0:
-            parts.append(f"[dim]Outs: {experiment.outputs_count}[/dim]")
+            parts.append(Text.from_markup(f"[dim]Outs: {experiment.outputs_count}[/dim]"))
 
         if experiment.logs_count > 0:
-            parts.append(f"[dim]Logs: {experiment.logs_count}[/dim]")
+            parts.append(Text.from_markup(f"[dim]Logs: {experiment.logs_count}[/dim]"))
 
-        return Text.from_markup("  ".join(parts))
+        if not parts:
+            return Text()
+
+        result = parts[0].copy()
+        for part in parts[1:]:
+            result.append("  ")
+            result.append(part)
+
+        return result
 
     def render_snapshot(self) -> None:
         if self.snapshot is None:
