@@ -15,14 +15,13 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Footer, Header, Static
 
-from .codex_focus import CodexFocusSummary, load_codex_focus, unavailable_focus
-from .codex_status import UNKNOWN_RUN_STATE, load_codex_run_states
+from .codex_focus import CodexFocusSummary, unavailable_focus
+from .api import AgentProvider, CodexProvider
+from .codex_status import UNKNOWN_RUN_STATE
 from .models import AgentSession, Experiment, ProjectSnapshot, Snapshot
 from .scanner import normalize_roots, scan_repositories
 from .time_format import friendly_time
 
-SessionRunLoader = Callable[[Sequence[str]], Mapping[str, str]]
-SessionFocusLoader = Callable[[str], CodexFocusSummary]
 
 
 class VibeBoardApp(App):
@@ -135,15 +134,13 @@ class VibeBoardApp(App):
         self,
         root: Optional[Path] = None,
         roots: Optional[Sequence[Path]] = None,
-        session_run_loader: Optional[SessionRunLoader] = None,
-        session_focus_loader: Optional[SessionFocusLoader] = None,
+        agent_provider: Optional[AgentProvider] = None,
     ) -> None:
         super().__init__()
         self.roots = tuple(normalize_roots(roots or ([root] if root is not None else [Path(".")])))
         self.root = self.roots[0]
         self.show_project_column = len(self.roots) > 1
-        self.session_run_loader = session_run_loader or load_codex_run_states
-        self.session_focus_loader = session_focus_loader or load_codex_focus
+        self.agent_provider = agent_provider or CodexProvider()
         self.snapshot: Optional[Snapshot] = None
         self.selected_exp_key: Optional[str] = None
         self.selected_session_id: Optional[str] = None
@@ -272,7 +269,7 @@ class VibeBoardApp(App):
             return
 
         try:
-            loaded_states = await asyncio.to_thread(self.session_run_loader, session_ids)
+            loaded_states = await asyncio.to_thread(self.agent_provider.get_run_states, session_ids)
         except Exception:
             loaded_states = {}
         self.session_run_states = {
@@ -514,7 +511,7 @@ class VibeBoardApp(App):
     async def refresh_session_focus(self, session_id: str) -> None:
         while self.selected_session_id == session_id:
             try:
-                summary = await asyncio.to_thread(self.session_focus_loader, session_id)
+                summary = await asyncio.to_thread(self.agent_provider.get_focus, session_id)
             except Exception:
                 summary = unavailable_focus(session_id, "Codex preview unavailable.")
             if self.selected_session_id != session_id:

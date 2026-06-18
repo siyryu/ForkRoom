@@ -10,6 +10,21 @@ from rich.spinner import Spinner
 from textual.widgets import DataTable, Static
 
 from vibe_board.app import VibeBoardApp
+from vibe_board.api import AgentProvider
+from vibe_board.codex_focus import CodexFocusSummary
+from typing import Sequence, Dict, Callable
+
+class FakeAgentProvider(AgentProvider):
+    def __init__(self, run_loader: Callable[[Sequence[str]], Dict[str, str]], focus_loader: Callable[[str], CodexFocusSummary]):
+        self.run_loader = run_loader
+        self.focus_loader = focus_loader
+        
+    def get_run_states(self, session_ids: Sequence[str], timeout_seconds: float = 4.0) -> Dict[str, str]:
+        return self.run_loader(session_ids)
+        
+    def get_focus(self, session_id: str, timeout_seconds: float = 4.0) -> CodexFocusSummary:
+        return self.focus_loader(session_id)
+
 from vibe_board.codex_focus import CodexFocusSummary
 
 
@@ -88,8 +103,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
 
             app = VibeBoardApp(
                 root=root,
-                session_run_loader=lambda ids: {session_id: "completed" for session_id in ids},
-                session_focus_loader=make_focus_loader("completed"),
+                agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "completed" for session_id in ids}, focus_loader=make_focus_loader("completed")),
             )
             async with app.run_test() as pilot:
                 await pilot.pause(0.3)
@@ -166,8 +180,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
             app = VibeBoardApp(
                 root=root,
-                session_run_loader=lambda ids: {"session-1": "active"},
-                session_focus_loader=make_focus_loader("active"),
+                agent_provider=FakeAgentProvider(run_loader=lambda ids: {"session-1": "active"}, focus_loader=make_focus_loader("active")),
             )
 
             async with app.run_test() as pilot:
@@ -193,8 +206,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             )
             app = VibeBoardApp(
                 root=root,
-                session_run_loader=lambda ids: {session_id: "active" for session_id in ids},
-                session_focus_loader=make_focus_loader("active"),
+                agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "active" for session_id in ids}, focus_loader=make_focus_loader("active")),
             )
 
             async with app.run_test() as pilot:
@@ -220,8 +232,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
                 app = VibeBoardApp(
                     root=root,
-                    session_run_loader=lambda ids: {session_id: run_state for session_id in ids},
-                    session_focus_loader=make_focus_loader(run_state),
+                    agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: run_state for session_id in ids}, focus_loader=make_focus_loader(run_state)),
                 )
 
                 async with app.run_test() as pilot:
@@ -239,8 +250,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
                 app = VibeBoardApp(
                     root=root,
-                    session_run_loader=lambda ids: {session_id: run_state for session_id in ids},
-                    session_focus_loader=make_focus_loader(run_state),
+                    agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: run_state for session_id in ids}, focus_loader=make_focus_loader(run_state)),
                 )
 
                 async with app.run_test() as pilot:
@@ -255,8 +265,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             write_experiment(root, sessions=None)
             app = VibeBoardApp(
                 root=root,
-                session_run_loader=lambda ids: {session_id: "active" for session_id in ids},
-                session_focus_loader=make_focus_loader("active"),
+                agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "active" for session_id in ids}, focus_loader=make_focus_loader("active")),
             )
 
             async with app.run_test() as pilot:
@@ -276,8 +285,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             write_experiment(root_b, sessions=[{"id": "session-b"}], updated_at="2026-06-15T12:00:00+08:00")
             app = VibeBoardApp(
                 roots=[root_a, root_b],
-                session_run_loader=lambda ids: {session_id: "completed" for session_id in ids},
-                session_focus_loader=make_focus_loader("completed"),
+                agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "completed" for session_id in ids}, focus_loader=make_focus_loader("completed")),
             )
 
             async with app.run_test() as pilot:
@@ -300,8 +308,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             write_experiment(root_b, sessions=[{"id": "session-b"}], updated_at="2026-06-15T11:00:00+08:00")
             app = VibeBoardApp(
                 roots=[root_a, root_b],
-                session_run_loader=lambda ids: {session_id: "active" for session_id in ids},
-                session_focus_loader=make_focus_loader("active"),
+                agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "active" for session_id in ids}, focus_loader=make_focus_loader("active")),
             )
 
             async with app.run_test() as pilot:
@@ -327,8 +334,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
 
             app = VibeBoardApp(
                 roots=[root_a, root_b],
-                session_run_loader=load_runs,
-                session_focus_loader=make_focus_loader("completed"),
+                agent_provider=FakeAgentProvider(run_loader=load_runs, focus_loader=make_focus_loader("completed")),
             )
 
             async with app.run_test() as pilot:
