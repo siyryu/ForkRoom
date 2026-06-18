@@ -230,6 +230,7 @@ class VibeBoardApp(App):
         if experiment is None:
             self.notify("No experiment selected.", severity="warning")
             return
+
         self.run_worker(self._open_in_zed(experiment.path), name="open-zed", group="open", exclusive=True)
 
     async def _open_in_zed(self, path: Path) -> None:
@@ -237,7 +238,9 @@ class VibeBoardApp(App):
             if not path.exists():
                 self.notify("Experiment path does not exist.", severity="error")
                 return
-            process = await asyncio.create_subprocess_exec("zed", str(path))
+            # Use -n (new window) to force Zed to open a new workspace,
+            # avoiding the issue where it just focuses an existing window of the root repo.
+            process = await asyncio.create_subprocess_exec("zed", "-n", str(path))
             await process.wait()
             self.notify(f"Opened {path.name} in Zed.", severity="information")
         except Exception as exc:
