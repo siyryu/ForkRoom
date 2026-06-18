@@ -102,15 +102,22 @@ class VibeBoardApp(App):
         height: 8;
     }
 
-    #sessions {
+    #sessions-content {
+        width: 100%;
         height: 1fr;
     }
 
+    #sessions {
+        width: 1fr;
+        height: 100%;
+    }
+
     #codex-focus {
-        height: 2fr;
+        width: 3fr;
+        height: 100%;
         background: $surface;
         padding: 1 2;
-        margin-top: 1;
+        margin-left: 1;
         overflow-y: auto;
     }
 
@@ -166,8 +173,9 @@ class VibeBoardApp(App):
                     yield DataTable(id="links")
                 with Vertical(id="sessions-panel"):
                     yield Static("SESSIONS (0)", id="sessions-title")
-                    yield DataTable(id="sessions", cursor_type="row")
-                    yield Static(self.codex_focus_placeholder(), id="codex-focus")
+                    with Horizontal(id="sessions-content"):
+                        yield DataTable(id="sessions", cursor_type="row")
+                        yield Static(self.codex_focus_placeholder(), id="codex-focus")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -181,7 +189,7 @@ class VibeBoardApp(App):
         experiments.add_column("Updated", key="updated")
         experiments.add_column("Stats", key="stats")
         sessions = self.query_one("#sessions", DataTable)
-        sessions.add_columns(("ID", "id"), ("Title", "title"), ("Run", "run"), ("Updated", "updated"))
+        sessions.add_columns(("Title", "title"), ("Run", "run"), ("Updated", "updated"))
         links = self.query_one("#links", DataTable)
         links.add_columns("Source", "Target", "Required", "Message", "Description")
         self.set_interval(self.AUTO_REFRESH_SECONDS, self.action_refresh, name="auto-refresh")
@@ -401,7 +409,7 @@ class VibeBoardApp(App):
 
         if experiment is None:
             self.selected_session_id = None
-            sync_table_rows(sessions, (), ("id", "title", "run", "updated"))
+            sync_table_rows(sessions, (), ("title", "run", "updated"))
             title.update("SESSIONS (0)")
             self.render_codex_focus(unavailable_focus("", "No session selected."))
             return
@@ -421,7 +429,6 @@ class VibeBoardApp(App):
                 (
                     session.id,
                     (
-                        session.id,
                         session.title,
                         self.session_run_state(session),
                         friendly_time(session.updated_at or session.created_at, now=now),
@@ -430,7 +437,7 @@ class VibeBoardApp(App):
             )
             if session.id == self.selected_session_id:
                 selected_row = index
-        sync_table_rows(sessions, rows, ("id", "title", "run", "updated"))
+        sync_table_rows(sessions, rows, ("title", "run", "updated"))
         if experiment.sessions:
             move_table_cursor(sessions, selected_row)
 
