@@ -28,34 +28,6 @@ class CodexRunInfo:
     active_flags: Tuple[str, ...] = ()
 
 
-def get_codex_child_threads(session_ids: Sequence[str]) -> Dict[str, List[str]]:
-    import sqlite3
-    db_path = os.environ.get("CODEX_HOME", os.path.expanduser("~/.codex"))
-    db_file = os.path.join(db_path, "state_5.sqlite")
-
-    mapping = {sid: [] for sid in session_ids}
-    if not os.path.exists(db_file):
-        return mapping
-
-    try:
-        uri = f"file:{db_file}?mode=ro"
-        conn = sqlite3.connect(uri, uri=True)
-        cur = conn.cursor()
-
-        placeholders = ",".join("?" for _ in session_ids)
-        query = f"SELECT parent_thread_id, child_thread_id FROM thread_spawn_edges WHERE parent_thread_id IN ({placeholders})"
-        cur.execute(query, tuple(session_ids))
-        for parent_id, child_id in cur.fetchall():
-            if parent_id in mapping:
-                mapping[parent_id].append(child_id)
-
-        conn.close()
-    except Exception:
-        pass
-
-    return mapping
-
-
 def load_codex_run_states(thread_ids: Sequence[str], timeout_seconds: float = 4.0) -> Dict[str, str]:
     unique_thread_ids = dedupe_thread_ids(thread_ids)
     if not unique_thread_ids:
@@ -65,38 +37,12 @@ def load_codex_run_states(thread_ids: Sequence[str], timeout_seconds: float = 4.
     if not codex_bin:
         return unknown_states(unique_thread_ids)
 
-    children_map = get_codex_child_threads(unique_thread_ids)
-    all_threads_to_query = list(unique_thread_ids)
-    for children in children_map.values():
-        all_threads_to_query.extend(children)
-    all_threads_to_query = dedupe_thread_ids(all_threads_to_query)
-
-    states = unknown_states(all_threads_to_query)
     for command in codex_status_commands(codex_bin):
         try:
-            states = load_codex_run_states_with_command(command, all_threads_to_query, timeout_seconds)
-            break
+            return load_codex_run_states_with_command(command, unique_thread_ids, timeout_seconds)
         except CodexStatusError:
             continue
-
-    result = {}
-    for parent_id in unique_thread_ids:
-        parent_state = states.get(parent_id, UNKNOWN_RUN_STATE)
-        child_states = [states.get(cid, UNKNOWN_RUN_STATE) for cid in children_map.get(parent_id, [])]
-
-        all_related_states = [parent_state] + child_states
-        if "waiting" in all_related_states:
-            result[parent_id] = "waiting"
-        elif "active" in all_related_states:
-            result[parent_id] = "active"
-        elif "failed" in all_related_states:
-            result[parent_id] = "failed"
-        elif "error" in all_related_states:
-            result[parent_id] = "error"
-        else:
-            result[parent_id] = parent_state
-
-    return result
+    return unknown_states(unique_thread_ids)
 
 
 def codex_status_commands(codex_bin: str) -> List[List[str]]:
