@@ -123,7 +123,7 @@ class VibeBoardApp(App):
     }
 
     #sessions {
-        width: 1fr;
+        width: 2fr;
         height: 100%;
     }
 
@@ -396,6 +396,7 @@ class VibeBoardApp(App):
         selected_row = 0
         now = datetime.now().astimezone()
         for index, experiment in enumerate(self.snapshot.experiments):
+            exp_title = experiment.title if len(experiment.title) <= 60 else experiment.title[:57] + "..."
             row_values = [
                 self.experiment_run_indicator(experiment),
             ]
@@ -403,7 +404,7 @@ class VibeBoardApp(App):
                 row_values.append(experiment.project_name)
             row_values.extend(
                 [
-                    experiment.title,
+                    exp_title,
                     Text(experiment.branch, style="dim"),
                     Text(friendly_time(experiment.updated_at, now=now), style="dim"),
                     self.format_experiment_stats(experiment),
@@ -462,11 +463,12 @@ class VibeBoardApp(App):
         now = datetime.now().astimezone()
         rows = []
         for index, session in enumerate(experiment.sessions):
+            title = session.title if len(session.title) <= 40 else session.title[:37] + "..."
             rows.append(
                 (
                     session.id,
                     (
-                        session.title,
+                        title,
                         self.session_run_state(session),
                         friendly_time(session.updated_at or session.created_at, now=now),
                     ),
