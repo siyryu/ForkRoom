@@ -26,6 +26,7 @@ Every experiment follows this structure:
   worktree/      <-- All code changes happen here
   outputs/
   logs/
+  runs/
   plan.md        <-- Optional; only when planning is explicitly requested
   handoff.md     <-- Generated during merge review
 ```
@@ -38,6 +39,8 @@ Instead of executing the entire lifecycle manually, delegate tasks to the follow
     Use when starting a new experiment. It handles `vibe-board init` to create the worktree, branch, and manifest, and automatically sets up local unindexed file symlinks (mapping).
 *   **`vibe-board-record`**
     Use when the user pastes text containing an experiment ID (usually copied via the TUI's 'c' shortcut) to quickly bind the current AI session to that experiment.
+*   **`vibe-board-run`**
+    Use when a long-running task needs tracked progress, ETA updates, and strict lifecycle management. It handles `vibe-board run` plus template-based progress updates inside temporary scaffolding.
 *   **`vibe-board-merge`**
     Use when an experiment is finished and needs to be merged back into the main repository. It uses a subagent to selectively port ONLY the core solution (discarding scaffolding), commits the changes, and generates a handoff document.
 

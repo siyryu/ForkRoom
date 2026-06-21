@@ -88,4 +88,40 @@ The command appends or updates the session in `.agents/exps/<exp-id>/manifest.js
 
 `vibe-board init` and `vibe-board record-session` intentionally operate on one `--root` at a time, even though the TUI can preview multiple roots.
 
+Track long-running work with an experiment run:
+
+```bash
+vibe-board run start \
+  --root . \
+  --exp my-experiment \
+  --id train-model \
+  --title "Train model" \
+  --eta 2h \
+  --progress 0 \
+  --message "Starting training"
+```
+
+Each run is stored as `.agents/exps/<exp-id>/runs/<run-id>.json` and belongs to the current Codex session via `CODEX_THREAD_ID`; pass `--session-id` only when the environment does not provide it. A session can own only one active run at a time. Active statuses are `pending`, `running`, and `waiting`; terminal statuses are `succeeded`, `failed`, and `canceled`.
+
+Every non-terminal update must refresh the ETA:
+
+```bash
+vibe-board run update \
+  --root . \
+  --exp my-experiment \
+  --id train-model \
+  --status running \
+  --eta "45m" \
+  --progress 40 \
+  --message "Completed epoch 4/10"
+```
+
+Finish exactly once:
+
+```bash
+vibe-board run succeed --root . --exp my-experiment --id train-model --message "Training complete"
+```
+
+For temporary scaffolding inside an experiment worktree, use `skills/vibe-board-run.md` and the Shell, Python, or Node templates under `skills/vibe-board-run/templates/`. Templates directly update an existing run JSON file and append events; they do not create runs, so the session uniqueness check stays centralized in `vibe-board run start`.
+
 The legacy `python3 scripts/init_experiment.py` and `python3 scripts/record_session.py` entry points remain as compatibility wrappers when working from the Vibe Board source tree.

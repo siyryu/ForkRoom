@@ -16,6 +16,24 @@ class AgentSession:
 
 
 @dataclass(frozen=True)
+class Run:
+    id: str
+    title: str
+    session_id: str
+    status: str
+    progress: Optional[int]
+    message: str
+    estimated_end_at: str
+    created_at: str
+    updated_at: str
+    started_at: str
+    ended_at: str
+    path: Path
+    events_count: int = 0
+    warnings: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class LinkRule:
     source: str
     target: str
@@ -69,6 +87,7 @@ class Experiment:
     handoff_exists: bool
     outputs_exists: bool
     logs_exists: bool
+    runs: List[Run] = field(default_factory=list)
     sessions: List[AgentSession] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     link_statuses: List[LinkStatus] = field(default_factory=list)

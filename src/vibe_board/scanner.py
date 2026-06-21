@@ -9,7 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 from urllib.parse import quote
 
-from .models import AgentSession, Experiment, LinkRule, LinkStatus, MapConfig, ProjectSnapshot, Snapshot
+from .models import AgentSession, Experiment, LinkRule, LinkStatus, MapConfig, ProjectSnapshot, Run, Snapshot
+from .runs import ACTIVE_RUN_STATUSES, validate_progress_value, validate_run_events
 
 
 EXPS_DIR = Path(".agents") / "exps"
@@ -37,7 +38,7 @@ def scan_repositories(roots: Sequence[Path]) -> Snapshot:
         experiments.extend(project_experiments)
 
     experiments.sort(key=experiment_updated_sort_key)
-    experiments = with_session_ownership_warnings(experiments)
+    experiments = with_active_run_ownership_warnings(with_session_ownership_warnings(experiments))
     primary = projects[0]
     return Snapshot(
         root=primary.root,
@@ -197,7 +198,7 @@ def load_experiments(
         )
     experiments.sort(key=experiment_updated_sort_key)
     if include_session_ownership_warnings:
-        return with_session_ownership_warnings(experiments)
+        return with_active_run_ownership_warnings(with_session_ownership_warnings(experiments))
     return experiments
 
 
@@ -253,6 +254,8 @@ def load_experiment(
 
     outputs_count = count_visible_files(exp_path / "outputs")
     logs_count = count_visible_files(exp_path / "logs")
+    runs = load_runs(exp_path, warnings)
+    updated_at = latest_timestamp_text([updated_at] + [run.updated_at for run in runs])
 
     return Experiment(
         key="{0}/{1}".format(project_key, exp_id),
@@ -279,10 +282,92 @@ def load_experiment(
         handoff_exists=(exp_path / "handoff.md").exists(),
         outputs_exists=(exp_path / "outputs").is_dir(),
         logs_exists=(exp_path / "logs").is_dir(),
+        runs=runs,
         sessions=sessions,
         warnings=warnings,
         link_statuses=link_statuses,
     )
+
+
+def load_runs(exp_path: Path, experiment_warnings: List[str]) -> List[Run]:
+    runs_path = exp_path / "runs"
+    if not runs_path.exists():
+        return []
+    if not runs_path.is_dir():
+        experiment_warnings.append("runs path is not a directory")
+        return []
+
+    runs: List[Run] = []
+    for run_path in sorted(runs_path.glob("*.json")):
+        run = load_run_file(run_path, experiment_warnings)
+        if run is not None:
+            runs.append(run)
+    runs.sort(key=run_updated_sort_key)
+    return runs
+
+
+def run_updated_sort_key(run: Run) -> Tuple[bool, float, str]:
+    updated_timestamp = _timestamp_value(run.updated_at)
+    return (updated_timestamp is None, -(updated_timestamp or 0), run.id)
+
+
+def load_run_file(path: Path, experiment_warnings: List[str]) -> Optional[Run]:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        experiment_warnings.append("run {0}: JSON is invalid: {1}".format(path.name, exc))
+        return None
+    if not isinstance(raw, Mapping):
+        experiment_warnings.append("run {0}: root must be an object".format(path.name))
+        return None
+
+    warnings: List[str] = []
+    run_id = _first_string(raw, ("id",)) or path.stem
+    if "id" not in raw:
+        warnings.append("run {0}: id is missing".format(run_id))
+    title = _first_string(raw, ("title", "name")) or run_id
+    session_id = _first_string(raw, ("session_id", "session", "thread_id"))
+    if not session_id:
+        warnings.append("run {0}: session_id is missing".format(run_id))
+
+    status = _first_string(raw, ("status",)) or "unknown"
+    progress = parse_run_progress(run_id, raw.get("progress"), warnings)
+    message = _first_string(raw, ("message",))
+    estimated_end_at = _first_string(raw, ("estimated_end_at", "eta"))
+    created_at = _first_string(raw, ("created_at", "started_at"))
+    updated_at = _first_string(raw, ("updated_at",)) or _mtime_text(path)
+    started_at = _first_string(raw, ("started_at",))
+    ended_at = _first_string(raw, ("ended_at",))
+    events = raw.get("events", [])
+    events_count = len(events) if isinstance(events, list) else 0
+
+    warnings.extend(validate_run_events(run_id, raw))
+    experiment_warnings.extend(warnings)
+    return Run(
+        id=run_id,
+        title=title,
+        session_id=session_id,
+        status=status,
+        progress=progress,
+        message=message,
+        estimated_end_at=estimated_end_at,
+        created_at=created_at,
+        updated_at=updated_at,
+        started_at=started_at,
+        ended_at=ended_at,
+        path=path,
+        events_count=events_count,
+        warnings=warnings,
+    )
+
+
+def parse_run_progress(run_id: str, value: Any, warnings: List[str]) -> Optional[int]:
+    if value is None:
+        return None
+    progress = validate_progress_value(value)
+    if progress is None:
+        warnings.append("run {0}: progress must be an integer between 0 and 100".format(run_id))
+    return progress
 
 
 def load_sessions(manifest: Mapping[str, Any], warnings: List[str], default_agent: str = "") -> List[AgentSession]:
@@ -402,6 +487,44 @@ def with_session_ownership_warnings(experiments: List[Experiment]) -> List[Exper
                         ", ".join(other_labels),
                     )
                 )
+        updated.append(replace(experiment, warnings=warnings))
+    return updated
+
+
+def with_active_run_ownership_warnings(experiments: List[Experiment]) -> List[Experiment]:
+    owners: Dict[str, List[Tuple[Experiment, Run]]] = {}
+    for experiment in experiments:
+        for run in experiment.runs:
+            if run.session_id and run.status in ACTIVE_RUN_STATUSES:
+                owners.setdefault(run.session_id, []).append((experiment, run))
+
+    duplicate_owners = {
+        session_id: owned_runs
+        for session_id, owned_runs in owners.items()
+        if len(owned_runs) > 1
+    }
+    if not duplicate_owners:
+        return experiments
+
+    use_project_labels = len({experiment.project_key for experiment in experiments}) > 1
+    updated: List[Experiment] = []
+    for experiment in experiments:
+        warnings = list(experiment.warnings)
+        for run in experiment.runs:
+            owned_runs = duplicate_owners.get(run.session_id)
+            if not owned_runs or run.status not in ACTIVE_RUN_STATUSES:
+                continue
+            other_labels = sorted(
+                "{0}/{1}".format(experiment_owner_label(owner, use_project_labels), owned_run.id)
+                for owner, owned_run in owned_runs
+                if owner.key != experiment.key or owned_run.id != run.id
+            )
+            warnings.append(
+                "session {0} has multiple active runs: {1}; a session can only own one active run".format(
+                    run.session_id,
+                    ", ".join(other_labels),
+                )
+            )
         updated.append(replace(experiment, warnings=warnings))
     return updated
 
@@ -571,3 +694,18 @@ def _mtime_text(path: Path) -> str:
         return str(int(path.stat().st_mtime))
     except OSError:
         return ""
+
+
+def latest_timestamp_text(values: Sequence[str]) -> str:
+    best_text = ""
+    best_value: Optional[float] = None
+    for value in values:
+        timestamp = _timestamp_value(value)
+        if timestamp is None:
+            if not best_text:
+                best_text = value
+            continue
+        if best_value is None or timestamp > best_value:
+            best_value = timestamp
+            best_text = value
+    return best_text

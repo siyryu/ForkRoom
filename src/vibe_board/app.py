@@ -19,6 +19,7 @@ from .codex_focus import CodexFocusSummary, unavailable_focus
 from .api import AgentProvider, CodexProvider
 from .codex_status import UNKNOWN_RUN_STATE
 from .models import AgentSession, Experiment, ProjectSnapshot, Snapshot
+from .runs import ACTIVE_RUN_STATUSES as ACTIVE_TRACKED_RUN_STATUSES
 from .scanner import normalize_roots, scan_repositories
 from .time_format import friendly_time
 
@@ -123,12 +124,12 @@ class VibeBoardApp(App):
     }
 
     #sessions {
-        width: 2fr;
+        width: 1fr;
         height: 100%;
     }
 
     #codex-focus {
-        width: 3fr;
+        width: 4fr;
         height: 100%;
         background: $surface;
         padding: 1 2;
@@ -212,6 +213,7 @@ class VibeBoardApp(App):
         sessions = self.query_one("#sessions", NoHoverDataTable)
         sessions.cursor_type = "row"
         sessions._set_hover_cursor(False)
+        sessions.add_column("ID", key="id", width=12)
         sessions.add_columns(("Title", "title"), ("Run", "run"), ("Updated", "updated"))
         links = self.query_one("#links", NoHoverDataTable)
         links._set_hover_cursor(False)
@@ -362,6 +364,10 @@ class VibeBoardApp(App):
         if worktree_stat:
             parts.append(Text.from_markup(worktree_stat))
 
+        run_stat = self.format_run_stats(experiment)
+        if run_stat:
+            parts.append(run_stat)
+
         if experiment.plan_lines > 0:
             parts.append(Text.from_markup(f"[dim]Plan: {experiment.plan_lines}L[/dim]"))
 
@@ -380,6 +386,22 @@ class VibeBoardApp(App):
             result.append(part)
 
         return result
+
+    def format_run_stats(self, experiment: Experiment) -> Optional[Text]:
+        if not experiment.runs:
+            return None
+        now = datetime.now().astimezone()
+        active_runs = self.active_tracked_runs(experiment)
+        if active_runs:
+            run = active_runs[0]
+            progress = self.run_progress_text(run.progress)
+            eta = friendly_time(run.estimated_end_at, now=now)
+            label = "Run: {0} ETA {1}".format(progress, eta)
+            if len(active_runs) > 1:
+                label = "Runs: {0} active ETA {1}".format(len(active_runs), eta)
+            return Text(label, style="cyan")
+        latest = experiment.runs[0]
+        return Text("Run: {0}".format(latest.status), style="dim")
 
     def render_snapshot(self) -> None:
         if self.snapshot is None:
@@ -447,7 +469,7 @@ class VibeBoardApp(App):
 
         if experiment is None:
             self.selected_session_id = None
-            sync_table_rows(sessions, (), ("title", "run", "updated"))
+            sync_table_rows(sessions, (), ("id", "title", "run", "updated"))
             title.update("SESSIONS (0)")
             self.render_codex_focus(unavailable_focus("", "No session selected."))
             return
@@ -468,6 +490,7 @@ class VibeBoardApp(App):
                 (
                     session.id,
                     (
+                        session.id,
                         title,
                         self.session_run_state(session),
                         friendly_time(session.updated_at or session.created_at, now=now),
@@ -476,7 +499,7 @@ class VibeBoardApp(App):
             )
             if session.id == self.selected_session_id:
                 selected_row = index
-        sync_table_rows(sessions, rows, ("title", "run", "updated"))
+        sync_table_rows(sessions, rows, ("id", "title", "run", "updated"))
         if experiment.sessions:
             move_table_cursor(sessions, selected_row)
 
@@ -684,11 +707,20 @@ class VibeBoardApp(App):
 
     def experiment_has_active_run(self, experiment: Experiment) -> bool:
         if experiment.key not in self._experiment_has_active_run_cache:
-            self._experiment_has_active_run_cache[experiment.key] = any(
+            has_active_session = any(
                 self.session_run_state(session) in self.ACTIVE_EXPERIMENT_RUN_STATES
                 for session in experiment.sessions
             )
+            self._experiment_has_active_run_cache[experiment.key] = has_active_session or bool(
+                self.active_tracked_runs(experiment)
+            )
         return self._experiment_has_active_run_cache[experiment.key]
+
+    def active_tracked_runs(self, experiment: Experiment):
+        return [run for run in experiment.runs if run.status in ACTIVE_TRACKED_RUN_STATUSES]
+
+    def run_progress_text(self, progress: Optional[int]) -> str:
+        return "{0}%".format(progress) if progress is not None else "unknown"
 
 
     def experiment_run_indicator(self, experiment: Experiment) -> object:
@@ -793,6 +825,8 @@ class VibeBoardApp(App):
                 ),
                 "Worktree exists: {0}".format(experiment.worktree_exists),
                 "Sessions: {0}".format(len(experiment.sessions)),
+                "Runs: {0}".format(len(experiment.runs)),
+                "Active runs: {0}".format(len(self.active_tracked_runs(experiment))),
                 "Handoff: {0}".format("present" if experiment.handoff_exists else "missing"),
                 "Outputs dir: {0}".format("present" if experiment.outputs_exists else "missing"),
                 "Logs dir: {0}".format("present" if experiment.logs_exists else "missing"),
@@ -800,11 +834,28 @@ class VibeBoardApp(App):
         )
         if experiment.summary:
             lines.extend(["", "Summary:", experiment.summary])
+        if experiment.runs:
+            lines.extend(["", "Runs:"])
+            lines.extend(self.run_detail_line(run, now) for run in experiment.runs[:5])
         lines.extend(["", "Plan:", experiment.plan_summary])
         if experiment.warnings:
             lines.extend(["", "Warnings:"])
             lines.extend("- {0}".format(warning) for warning in experiment.warnings)
         return "\n".join(lines)
+
+    def run_detail_line(self, run, now: datetime) -> str:
+        bits = [
+            "- {0} ({1})".format(run.title, run.id),
+            "Status: {0}".format(run.status),
+            "Progress: {0}".format(self.run_progress_text(run.progress)),
+        ]
+        if run.estimated_end_at:
+            bits.append("ETA: {0}".format(friendly_time(run.estimated_end_at, now=now)))
+        if run.updated_at:
+            bits.append("Updated: {0}".format(friendly_time(run.updated_at, now=now)))
+        if run.message:
+            bits.append("Message: {0}".format(run.message))
+        return "  ".join(bits)
 
     async def refresh_worktree_stats(self, snapshot: Snapshot) -> None:
         async def fetch_stat(experiment: Experiment) -> Tuple[str, str]:

@@ -3,8 +3,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Sequence
 
-from .app import VibeBoardApp
-from . import init_experiment, record_session
+from . import init_experiment, record_session, runs
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,6 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("tui", help="open the read-only experiment dashboard")
     subparsers.add_parser("init", help="initialize a worktree-backed experiment")
     subparsers.add_parser("record-session", help="record a Codex session on an experiment")
+    subparsers.add_parser("run", help="create or update a tracked long-running task")
     return parser
 
 
@@ -42,12 +42,16 @@ def main(argv: Optional[Sequence[str]] = None) -> Optional[int]:
         return init_experiment.main(raw_args[1:], prog="vibe-board init")
     if raw_args and raw_args[0] == "record-session":
         return record_session.main(raw_args[1:], prog="vibe-board record-session")
+    if raw_args and raw_args[0] == "run":
+        return runs.main(raw_args[1:], prog="vibe-board run")
     if raw_args and raw_args[0] == "tui":
         return run_tui(raw_args[1:], prog="vibe-board tui")
     return run_tui(raw_args, prog="vibe-board")
 
 
 def run_tui(argv: Sequence[str], prog: str) -> None:
+    from .app import VibeBoardApp
+
     args = build_tui_parser(prog=prog).parse_args(argv)
     app = VibeBoardApp(roots=resolve_tui_roots(args.root))
     app.run()
