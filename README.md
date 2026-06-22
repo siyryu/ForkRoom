@@ -4,6 +4,10 @@ ForkRoom is a replacement for traditional worktrees that helps you run multiple 
 When you start a new experiment, it keeps code changes, plans, runs, outputs, and logs together so every trial has one place to live.
 It is a minimal implementation of an AI-native coding ecosystem: you keep full control of everything and can use any coding agent you like, including Codex, Claude Code, and others.
 
+The dashboard keeps experiments, sessions, and live run details visible in one place:
+
+![ForkRoom dashboard preview](docs/assets/forkroom-dashboard-preview.png)
+
 ## Install
 
 1. Open your project directory.
