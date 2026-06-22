@@ -15,30 +15,6 @@ uvx --from git+https://github.com/siyryu/forkroom.git forkroom install
 
 This installs the `forkroom` CLI and the ForkRoom skills for the current project.
 
-## Contribute
-
-Clone ForkRoom and install the local CLI in editable mode:
-
-```bash
-FORKROOM_REPO="$HOME/Developer/forkroom"
-
-git clone https://github.com/siyryu/forkroom.git "$FORKROOM_REPO"
-cd "$FORKROOM_REPO"
-uv tool install --force --editable .
-```
-
-Link the local skills into a project you use for testing:
-
-```bash
-forkroom install --root /path/to/your-project --source . --link-skills --no-tool-install
-```
-
-Run the tests before sending changes:
-
-```bash
-uv run --with pytest python -m pytest
-```
-
 ## Usage
 
 Use ForkRoom from the repository root where you want experiments to live.
@@ -91,3 +67,27 @@ git push
 ```
 
 The experiment should also get a `.agents/exps/my-experiment/handoff.md` file with the commit ID, merged files, and any follow-up notes.
+
+## Contribute
+
+Clone ForkRoom and install the local CLI in editable mode:
+
+```bash
+FORKROOM_REPO="$HOME/Developer/forkroom"
+
+git clone https://github.com/siyryu/forkroom.git "$FORKROOM_REPO"
+cd "$FORKROOM_REPO"
+uv tool install --force --editable .
+```
+
+Link the local skills into a project you use for testing:
+
+```bash
+forkroom install --root /path/to/your-project --source . --link-skills --no-tool-install
+```
+
+Run the tests before sending changes:
+
+```bash
+uv run --with pytest python -m pytest
+```
