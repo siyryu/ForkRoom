@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Sequence
 
-from . import init_experiment, record_session, runs
+from . import init_experiment, install as installer, record_session, runs
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -14,6 +14,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
     subparsers.add_parser("tui", help="open the read-only experiment dashboard")
     subparsers.add_parser("init", help="initialize a worktree-backed experiment")
+    subparsers.add_parser("install", help="install ForkRoom CLI and skills into a project")
     subparsers.add_parser("record-session", help="record a Codex session on an experiment")
     subparsers.add_parser("run", help="create or update a tracked long-running task")
     return parser
@@ -40,6 +41,8 @@ def main(argv: Optional[Sequence[str]] = None) -> Optional[int]:
         return 0
     if raw_args and raw_args[0] == "init":
         return init_experiment.main(raw_args[1:], prog="forkroom init")
+    if raw_args and raw_args[0] == "install":
+        return installer.main(raw_args[1:], prog="forkroom install")
     if raw_args and raw_args[0] == "record-session":
         return record_session.main(raw_args[1:], prog="forkroom record-session")
     if raw_args and raw_args[0] == "run":

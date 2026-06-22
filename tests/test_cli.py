@@ -68,6 +68,21 @@ def test_cli_record_session_updates_manifest(tmp_path: Path, capsys) -> None:
     assert manifest["sessions"][0]["title"] == "CLI session"
 
 
+def test_cli_install_dispatches_to_installer(monkeypatch) -> None:
+    calls = []
+
+    def fake_main(argv, prog):
+        calls.append((argv, prog))
+        return 0
+
+    monkeypatch.setattr("forkroom.cli.installer.main", fake_main)
+
+    exit_code = main(["install", "--root", "/tmp/project"])
+
+    assert exit_code == 0
+    assert calls == [(["--root", "/tmp/project"], "forkroom install")]
+
+
 def test_tui_parser_defaults_to_current_root() -> None:
     args = build_tui_parser().parse_args([])
 
