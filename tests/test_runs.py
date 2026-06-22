@@ -34,8 +34,10 @@ def test_cli_run_lifecycle_writes_events_and_updates_manifest(tmp_path: Path, ca
             "session-1",
             "--eta",
             ETA_ONE,
-            "--progress",
+            "--completed",
             "10",
+            "--total",
+            "100",
             "--message",
             "Starting",
             "--created-at",
@@ -49,7 +51,8 @@ def test_cli_run_lifecycle_writes_events_and_updates_manifest(tmp_path: Path, ca
     run = json.loads(run_path.read_text(encoding="utf-8"))
     assert run["status"] == "running"
     assert run["session_id"] == "session-1"
-    assert run["progress"] == 10
+    assert run["completed"] == 10
+    assert run["total"] == 100
     assert run["events"][0]["type"] == "start"
 
     exit_code = cli_main(
@@ -66,7 +69,7 @@ def test_cli_run_lifecycle_writes_events_and_updates_manifest(tmp_path: Path, ca
             "waiting",
             "--eta",
             ETA_TWO,
-            "--progress",
+            "--completed",
             "40",
             "--message",
             "Waiting for quota",
@@ -78,7 +81,8 @@ def test_cli_run_lifecycle_writes_events_and_updates_manifest(tmp_path: Path, ca
     assert exit_code == 0
     run = json.loads(run_path.read_text(encoding="utf-8"))
     assert run["status"] == "waiting"
-    assert run["progress"] == 40
+    assert run["completed"] == 40
+    assert run["total"] == 100
     assert run["message"] == "Waiting for quota"
     assert len(run["events"]) == 2
 
@@ -103,7 +107,8 @@ def test_cli_run_lifecycle_writes_events_and_updates_manifest(tmp_path: Path, ca
     run = json.loads(run_path.read_text(encoding="utf-8"))
     manifest = json.loads((root / ".agents" / "exps" / "alpha" / "manifest.json").read_text(encoding="utf-8"))
     assert run["status"] == "succeeded"
-    assert run["progress"] == 100
+    assert run["completed"] == 100
+    assert run["total"] == 100
     assert run["ended_at"].startswith("2026-06-15T")
     assert run["events"][-1]["status"] == "succeeded"
     assert manifest["updated_at"].startswith("2026-06-15T")
@@ -197,14 +202,16 @@ def test_scanner_loads_runs_and_warns_for_template_violations(tmp_path: Path) ->
             "title": "Manual one",
             "session_id": "shared-session",
             "status": "running",
-            "progress": 50,
+            "completed": 50,
+            "total": 100,
             "estimated_end_at": ETA_TWO,
             "updated_at": ETA_ONE,
             "events": [
                 {
                     "type": "start",
                     "status": "running",
-                    "progress": 10,
+                    "completed": 10,
+                    "total": 100,
                     "estimated_end_at": ETA_ONE,
                     "updated_at": FIXED_TIME,
                 }
@@ -220,7 +227,8 @@ def test_scanner_loads_runs_and_warns_for_template_violations(tmp_path: Path) ->
             "title": "Manual two",
             "session_id": "shared-session",
             "status": "waiting",
-            "progress": 20,
+            "completed": 20,
+            "total": 100,
             "updated_at": ETA_ONE,
             "events": [
                 {"type": "start", "status": "running", "estimated_end_at": ETA_ONE, "updated_at": FIXED_TIME},
@@ -258,6 +266,10 @@ def start_run(root: Path, exp_id: str, run_id: str, session_id: str) -> int:
             session_id,
             "--eta",
             ETA_ONE,
+            "--completed",
+            "0",
+            "--total",
+            "1",
             "--created-at",
             FIXED_TIME,
         ]

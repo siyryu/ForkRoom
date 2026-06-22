@@ -14,7 +14,7 @@ TERMINAL = {"succeeded", "failed", "canceled"}
 NON_TERMINAL = {"pending", "running", "waiting"}
 
 
-def update_vibe_run(run_file: str, status: str, progress: Optional[int], message: str, estimated_end_at: str = "") -> None:
+def update_vibe_run(run_file: str, status: str, completed: Optional[int], total: Optional[int], message: str, estimated_end_at: str = "") -> None:
     path = Path(run_file)
     run = json.loads(path.read_text(encoding="utf-8"))
     if run.get("status") in TERMINAL:
@@ -23,12 +23,17 @@ def update_vibe_run(run_file: str, status: str, progress: Optional[int], message
         raise ValueError(f"invalid run status: {status}")
     if status in NON_TERMINAL and not estimated_end_at:
         raise ValueError("estimated_end_at is required for non-terminal run updates")
-    if progress is not None and not 0 <= progress <= 100:
-        raise ValueError("progress must be between 0 and 100")
+    if completed is not None and completed < 0:
+        raise ValueError("completed must be non-negative")
+    if total is not None and total < 0:
+        raise ValueError("total must be non-negative")
+    if completed is not None and total is not None and completed > total:
+        raise ValueError("completed cannot exceed total")
 
     updated_at = datetime.now().astimezone().replace(microsecond=0).isoformat()
     run["status"] = status
-    run["progress"] = progress if progress is not None else run.get("progress")
+    run["completed"] = completed if completed is not None else run.get("completed")
+    run["total"] = total if total is not None else run.get("total")
     run["message"] = message or run.get("message", "")
     run["updated_at"] = updated_at
     if status in TERMINAL:
@@ -40,7 +45,8 @@ def update_vibe_run(run_file: str, status: str, progress: Optional[int], message
         {
             "type": "template-update",
             "status": status,
-            "progress": run.get("progress"),
+            "completed": run.get("completed"),
+            "total": run.get("total"),
             "message": run.get("message", ""),
             "estimated_end_at": run.get("estimated_end_at", ""),
             "updated_at": updated_at,
@@ -54,5 +60,5 @@ def update_vibe_run(run_file: str, status: str, progress: Optional[int], message
 Call it from a loop:
 
 ```python
-update_vibe_run(".agents/exps/<exp-id>/runs/<run-id>.json", "running", 45, "Processed 450/1000 rows", "2026-06-22T18:30:00+08:00")
+update_vibe_run(".agents/exps/<exp-id>/runs/<run-id>.json", "running", 450, 1000, "Processed 450/1000 rows", "2026-06-22T18:30:00+08:00")
 ```

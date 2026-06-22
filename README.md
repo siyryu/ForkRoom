@@ -170,7 +170,8 @@ vibe-board run start \
   --id train-model \
   --title "Train model" \
   --eta 2h \
-  --progress 0 \
+  --completed 0 \
+  --total 10 \
   --message "Starting training"
 ```
 
@@ -185,7 +186,8 @@ vibe-board run update \
   --id train-model \
   --status running \
   --eta "45m" \
-  --progress 40 \
+  --completed 4 \
+  --total 10 \
   --message "Completed epoch 4/10"
 ```
 

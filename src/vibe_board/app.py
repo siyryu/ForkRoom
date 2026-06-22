@@ -364,10 +364,6 @@ class VibeBoardApp(App):
         if worktree_stat:
             parts.append(Text.from_markup(worktree_stat))
 
-        run_stat = self.format_run_stats(experiment)
-        if run_stat:
-            parts.append(run_stat)
-
         if experiment.plan_lines > 0:
             parts.append(Text.from_markup(f"[dim]Plan: {experiment.plan_lines}L[/dim]"))
 
@@ -376,6 +372,10 @@ class VibeBoardApp(App):
 
         if experiment.logs_count > 0:
             parts.append(Text.from_markup(f"[dim]Logs: {experiment.logs_count}[/dim]"))
+
+        run_stat = self.format_run_stats(experiment)
+        if run_stat:
+            parts.append(run_stat)
 
         if not parts:
             return Text()
@@ -394,7 +394,7 @@ class VibeBoardApp(App):
         active_runs = self.active_tracked_runs(experiment)
         if active_runs:
             run = active_runs[0]
-            progress = self.run_progress_text(run.progress)
+            progress = self.run_progress_text(run.completed, run.total)
             eta = friendly_time(run.estimated_end_at, now=now)
             label = "Run: {0} ETA {1}".format(progress, eta)
             if len(active_runs) > 1:
@@ -719,8 +719,14 @@ class VibeBoardApp(App):
     def active_tracked_runs(self, experiment: Experiment):
         return [run for run in experiment.runs if run.status in ACTIVE_TRACKED_RUN_STATUSES]
 
-    def run_progress_text(self, progress: Optional[int]) -> str:
-        return "{0}%".format(progress) if progress is not None else "unknown"
+    def run_progress_text(self, completed: Optional[int], total: Optional[int]) -> str:
+        if completed is not None and total is not None:
+            return "{0}/{1}".format(completed, total)
+        if completed is not None:
+            return "{0}/?".format(completed)
+        if total is not None:
+            return "?/{0}".format(total)
+        return "unknown"
 
 
     def experiment_run_indicator(self, experiment: Experiment) -> object:
@@ -847,7 +853,7 @@ class VibeBoardApp(App):
         bits = [
             "- {0} ({1})".format(run.title, run.id),
             "Status: {0}".format(run.status),
-            "Progress: {0}".format(self.run_progress_text(run.progress)),
+            "Progress: {0}".format(self.run_progress_text(run.completed, run.total)),
         ]
         if run.estimated_end_at:
             bits.append("ETA: {0}".format(friendly_time(run.estimated_end_at, now=now)))

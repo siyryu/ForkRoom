@@ -21,7 +21,8 @@ class Run:
     title: str
     session_id: str
     status: str
-    progress: Optional[int]
+    completed: Optional[int]
+    total: Optional[int]
     message: str
     estimated_end_at: str
     created_at: str

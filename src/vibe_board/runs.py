@@ -78,7 +78,8 @@ def build_parser(prog: Optional[str] = None) -> argparse.ArgumentParser:
         help="Initial non-terminal status. Defaults to running.",
     )
     start.add_argument("--eta", required=True, help="Estimated end time as ISO timestamp or duration like 30m/2h.")
-    start.add_argument("--progress", type=int, default=None, help="Progress percentage, 0-100.")
+    start.add_argument("--completed", type=int, default=None, help="Completed item count.")
+    start.add_argument("--total", type=int, default=None, help="Total item count.")
     start.add_argument("--message", default="", help="Progress message.")
     start.add_argument("--created-at", default="", help="Creation timestamp. Defaults to now.")
 
@@ -91,7 +92,8 @@ def build_parser(prog: Optional[str] = None) -> argparse.ArgumentParser:
         help="Updated non-terminal status. Defaults to the current status.",
     )
     update.add_argument("--eta", required=True, help="Estimated end time as ISO timestamp or duration like 30m/2h.")
-    update.add_argument("--progress", type=int, default=None, help="Progress percentage, 0-100.")
+    update.add_argument("--completed", type=int, default=None, help="Completed item count.")
+    update.add_argument("--total", type=int, default=None, help="Total item count.")
     update.add_argument("--message", default="", help="Progress message.")
     update.add_argument("--updated-at", default="", help="Update timestamp. Defaults to now.")
 
@@ -124,7 +126,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
                 session_id=args.session_id or os.environ.get("CODEX_THREAD_ID", ""),
                 status=args.status,
                 eta=args.eta,
-                progress=args.progress,
+                completed=args.completed,
+                total=args.total,
                 message=args.message,
                 created_at=args.created_at,
             )
@@ -135,7 +138,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
                 run_id=args.id,
                 status=args.status,
                 eta=args.eta,
-                progress=args.progress,
+                completed=args.completed,
+                total=args.total,
                 message=args.message,
                 updated_at=args.updated_at,
             )
@@ -183,7 +187,8 @@ def start_run(
     session_id: str,
     status: str = "running",
     eta: str = "",
-    progress: Optional[int] = None,
+    completed: Optional[int] = None,
+    total: Optional[int] = None,
     message: str = "",
     created_at: str = "",
 ) -> Dict[str, Any]:
@@ -193,7 +198,9 @@ def start_run(
     title = required_text(title, "title")
     session_id = required_text(session_id, "session-id")
     status = validate_status(status, allow_terminal=False)
-    progress_value = validate_progress(progress)
+    completed_value = validate_count(completed, "completed")
+    total_value = validate_count(total, "total")
+    validate_fraction(completed_value, total_value)
     timestamp = normalize_timestamp(created_at or now_text(), "created-at")
     estimated_end_at = parse_eta(eta, now=_parse_timestamp(timestamp) or datetime.now().astimezone())
     run_path = run_file_path(exp_path, run_id)
@@ -216,7 +223,8 @@ def start_run(
         "title": title,
         "session_id": session_id,
         "status": status,
-        "progress": progress_value,
+        "completed": completed_value,
+        "total": total_value,
         "message": message.strip(),
         "estimated_end_at": estimated_end_at,
         "created_at": timestamp,
@@ -227,7 +235,8 @@ def start_run(
             build_event(
                 kind="start",
                 status=status,
-                progress=progress_value,
+                completed=completed_value,
+                total=total_value,
                 message=message,
                 estimated_end_at=estimated_end_at,
                 updated_at=timestamp,
@@ -245,7 +254,8 @@ def update_run(
     run_id: str,
     status: str = "",
     eta: str = "",
-    progress: Optional[int] = None,
+    completed: Optional[int] = None,
+    total: Optional[int] = None,
     message: str = "",
     updated_at: str = "",
 ) -> Dict[str, Any]:
@@ -261,13 +271,16 @@ def update_run(
 
     next_status = validate_status(status or current_status, allow_terminal=False)
     validate_transition(current_status, next_status)
-    progress_value = validate_progress(progress if progress is not None else run.get("progress"))
+    completed_value = validate_count(completed if completed is not None else run.get("completed"), "completed")
+    total_value = validate_count(total if total is not None else run.get("total"), "total")
+    validate_fraction(completed_value, total_value)
     timestamp = normalize_timestamp(updated_at or now_text(), "updated-at")
     estimated_end_at = parse_eta(eta, now=_parse_timestamp(timestamp) or datetime.now().astimezone())
     next_message = message.strip() if message.strip() else str(run.get("message", ""))
 
     run["status"] = next_status
-    run["progress"] = progress_value
+    run["completed"] = completed_value
+    run["total"] = total_value
     run["message"] = next_message
     run["estimated_end_at"] = estimated_end_at
     run["updated_at"] = timestamp
@@ -275,7 +288,8 @@ def update_run(
         build_event(
             kind="update",
             status=next_status,
-            progress=progress_value,
+            completed=completed_value,
+            total=total_value,
             message=next_message,
             estimated_end_at=estimated_end_at,
             updated_at=timestamp,
@@ -309,10 +323,15 @@ def finish_run(
 
     timestamp = normalize_timestamp(updated_at or now_text(), "updated-at")
     next_message = message.strip() if message.strip() else str(run.get("message", ""))
-    progress_value = validate_progress(100 if status == "succeeded" else run.get("progress"))
+    existing_total = validate_count(run.get("total"), "total")
+    completed_value = validate_count(run.get("completed"), "completed")
+    if status == "succeeded" and existing_total is not None:
+        completed_value = existing_total
+    validate_fraction(completed_value, existing_total)
 
     run["status"] = status
-    run["progress"] = progress_value
+    run["completed"] = completed_value
+    run["total"] = existing_total
     run["message"] = next_message
     run["updated_at"] = timestamp
     run["ended_at"] = timestamp
@@ -322,7 +341,8 @@ def finish_run(
         build_event(
             kind=status,
             status=status,
-            progress=progress_value,
+            completed=completed_value,
+            total=existing_total,
             message=next_message,
             estimated_end_at=str(run.get("estimated_end_at", "")),
             updated_at=timestamp,
@@ -366,9 +386,14 @@ def validate_run_events(run_id: str, data: Mapping[str, Any]) -> List[str]:
     if status in TERMINAL_RUN_STATUSES and not str(data.get("ended_at", "")).strip():
         warnings.append("run {0}: terminal status should include ended_at".format(run_id))
 
-    progress = data.get("progress")
-    if progress is not None and validate_progress_value(progress) is None:
-        warnings.append("run {0}: progress must be an integer between 0 and 100".format(run_id))
+    completed = validate_count_value(data.get("completed"))
+    total = validate_count_value(data.get("total"))
+    if data.get("completed") is not None and completed is None:
+        warnings.append("run {0}: completed must be a non-negative integer".format(run_id))
+    if data.get("total") is not None and total is None:
+        warnings.append("run {0}: total must be a non-negative integer".format(run_id))
+    if completed is not None and total is not None and completed > total:
+        warnings.append("run {0}: completed cannot exceed total".format(run_id))
 
     raw_events = data.get("events")
     if raw_events is None:
@@ -402,6 +427,14 @@ def validate_run_events(run_id: str, data: Mapping[str, Any]) -> List[str]:
                     index,
                 )
             )
+        event_completed = validate_count_value(event.get("completed"))
+        event_total = validate_count_value(event.get("total"))
+        if event.get("completed") is not None and event_completed is None:
+            warnings.append("run {0}: events[{1}] completed must be a non-negative integer".format(run_id, index))
+        if event.get("total") is not None and event_total is None:
+            warnings.append("run {0}: events[{1}] total must be a non-negative integer".format(run_id, index))
+        if event_completed is not None and event_total is not None and event_completed > event_total:
+            warnings.append("run {0}: events[{1}] completed cannot exceed total".format(run_id, index))
         previous_status = event_status
         last_event_status = event_status
         terminal_seen = event_status in TERMINAL_RUN_STATUSES
@@ -429,7 +462,8 @@ def validate_transition(current: str, next_status: str) -> None:
 def build_event(
     kind: str,
     status: str,
-    progress: Optional[int],
+    completed: Optional[int],
+    total: Optional[int],
     message: str,
     estimated_end_at: str,
     updated_at: str,
@@ -438,7 +472,8 @@ def build_event(
     event: Dict[str, Any] = {
         "type": kind,
         "status": status,
-        "progress": progress,
+        "completed": completed,
+        "total": total,
         "message": message.strip(),
         "estimated_end_at": estimated_end_at,
         "updated_at": updated_at,
@@ -502,25 +537,30 @@ def validate_status(status: str, allow_terminal: bool, terminal_only: bool = Fal
     return status
 
 
-def validate_progress(value: Any) -> Optional[int]:
+def validate_count(value: Any, label: str) -> Optional[int]:
     if value is None:
         return None
-    progress = validate_progress_value(value)
-    if progress is None:
-        raise RunError("progress must be an integer between 0 and 100", code="invalid_progress")
-    return progress
+    count = validate_count_value(value)
+    if count is None:
+        raise RunError("{0} must be a non-negative integer".format(label), code="invalid_{0}".format(label))
+    return count
 
 
-def validate_progress_value(value: Any) -> Optional[int]:
-    if isinstance(value, bool):
+def validate_count_value(value: Any) -> Optional[int]:
+    if value is None or isinstance(value, bool):
         return None
     try:
-        progress = int(value)
+        count = int(value)
     except (TypeError, ValueError):
         return None
-    if progress < 0 or progress > 100:
+    if count < 0:
         return None
-    return progress
+    return count
+
+
+def validate_fraction(completed: Optional[int], total: Optional[int]) -> None:
+    if completed is not None and total is not None and completed > total:
+        raise RunError("completed cannot exceed total", code="invalid_fraction")
 
 
 def parse_eta(value: str, now: Optional[datetime] = None) -> str:

@@ -42,10 +42,12 @@ class AppRunTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertIsInstance(indicator, Padding)
                 self.assertIsInstance(indicator.renderable, Spinner)
-                self.assertIn("Run: 42% ETA", str(stats))
+                stats_text = str(stats)
+                self.assertIn("Run: 42/100 ETA", stats_text)
+                self.assertLess(stats_text.index("Outs: 1"), stats_text.index("Run: 42/100"))
                 self.assertIn("Runs: 1", details)
                 self.assertIn("Active runs: 1", details)
-                self.assertIn("Progress: 42%", details)
+                self.assertIn("Progress: 42/100", details)
                 self.assertIn("ETA:", details)
 
 
@@ -54,6 +56,7 @@ def write_experiment_with_run(root: Path) -> None:
     (exp / "worktree").mkdir(parents=True)
     (exp / "outputs").mkdir()
     (exp / "logs").mkdir()
+    (exp / "outputs" / "artifact.txt").write_text("artifact\n", encoding="utf-8")
     (exp / "manifest.json").write_text(
         json.dumps(
             {
@@ -75,7 +78,8 @@ def write_experiment_with_run(root: Path) -> None:
                 "title": "Crawl pages",
                 "session_id": "session-1",
                 "status": "running",
-                "progress": 42,
+                "completed": 42,
+                "total": 100,
                 "message": "Crawling",
                 "estimated_end_at": "2026-06-15T12:00:00+08:00",
                 "created_at": "2026-06-15T10:00:00+08:00",
@@ -86,7 +90,8 @@ def write_experiment_with_run(root: Path) -> None:
                     {
                         "type": "start",
                         "status": "running",
-                        "progress": 42,
+                        "completed": 42,
+                        "total": 100,
                         "message": "Crawling",
                         "estimated_end_at": "2026-06-15T12:00:00+08:00",
                         "updated_at": "2026-06-15T10:30:00+08:00",

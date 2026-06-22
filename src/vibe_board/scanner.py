@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 from urllib.parse import quote
 
 from .models import AgentSession, Experiment, LinkRule, LinkStatus, MapConfig, ProjectSnapshot, Run, Snapshot
-from .runs import ACTIVE_RUN_STATUSES, validate_progress_value, validate_run_events
+from .runs import ACTIVE_RUN_STATUSES, validate_count_value, validate_run_events
 
 
 EXPS_DIR = Path(".agents") / "exps"
@@ -331,7 +331,8 @@ def load_run_file(path: Path, experiment_warnings: List[str]) -> Optional[Run]:
         warnings.append("run {0}: session_id is missing".format(run_id))
 
     status = _first_string(raw, ("status",)) or "unknown"
-    progress = parse_run_progress(run_id, raw.get("progress"), warnings)
+    completed = parse_run_count(run_id, "completed", raw.get("completed"), warnings)
+    total = parse_run_count(run_id, "total", raw.get("total"), warnings)
     message = _first_string(raw, ("message",))
     estimated_end_at = _first_string(raw, ("estimated_end_at", "eta"))
     created_at = _first_string(raw, ("created_at", "started_at"))
@@ -348,7 +349,8 @@ def load_run_file(path: Path, experiment_warnings: List[str]) -> Optional[Run]:
         title=title,
         session_id=session_id,
         status=status,
-        progress=progress,
+        completed=completed,
+        total=total,
         message=message,
         estimated_end_at=estimated_end_at,
         created_at=created_at,
@@ -361,13 +363,13 @@ def load_run_file(path: Path, experiment_warnings: List[str]) -> Optional[Run]:
     )
 
 
-def parse_run_progress(run_id: str, value: Any, warnings: List[str]) -> Optional[int]:
+def parse_run_count(run_id: str, label: str, value: Any, warnings: List[str]) -> Optional[int]:
     if value is None:
         return None
-    progress = validate_progress_value(value)
-    if progress is None:
-        warnings.append("run {0}: progress must be an integer between 0 and 100".format(run_id))
-    return progress
+    count = validate_count_value(value)
+    if count is None:
+        warnings.append("run {0}: {1} must be a non-negative integer".format(run_id, label))
+    return count
 
 
 def load_sessions(manifest: Mapping[str, Any], warnings: List[str], default_agent: str = "") -> List[AgentSession]:

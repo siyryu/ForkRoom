@@ -17,7 +17,8 @@ Use this skill when a task will take long enough that the user benefits from pro
      --id "<run-id>" \
      --title "<human title>" \
      --eta "<iso-time-or-duration>" \
-     --progress 0 \
+     --completed 0 \
+     --total "<total-items>" \
      --message "Starting"
    ```
    `vibe-board run start` reads `CODEX_THREAD_ID` by default. Pass `--session-id` only when the environment does not provide it.
@@ -29,7 +30,8 @@ Use this skill when a task will take long enough that the user benefits from pro
      --exp "<exp-id>" \
      --id "<run-id>" \
      --eta "30m" \
-     --progress 45 \
+     --completed 450 \
+     --total 1000 \
      --message "Processed 450/1000 items"
    ```
 4. Finish with exactly one terminal state:
