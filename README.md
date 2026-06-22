@@ -2,7 +2,80 @@
 
 Vibe Board is a read-only terminal dashboard for worktree-backed agent coding experiments.
 
-Run it from a repository root:
+## Quick install
+
+Vibe Board has two install paths:
+
+- **Standard install (recommended)** installs the TUI from GitHub with `uv`, then copies the Codex skills into the repository where you want to use Vibe Board.
+- **Developer install** clones this repository locally and symlinks the skills into another repository, so skill edits in the clone are reflected immediately in the installed skill.
+
+### Standard install (recommended)
+
+Install the TUI from GitHub:
+
+```bash
+uv tool install "git+https://github.com/siyryu/vibe-board.git"
+```
+
+Then install the skills into the repository where Codex should use Vibe Board:
+
+```bash
+cd /path/to/your-repo
+CODEX_SKILLS_DIR="$PWD/.codex/skills"
+VIBE_BOARD_TMP="$(mktemp -d)"
+
+mkdir -p "$CODEX_SKILLS_DIR"
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/siyryu/vibe-board.git "$VIBE_BOARD_TMP"
+git -C "$VIBE_BOARD_TMP" sparse-checkout set skills
+cp -R "$VIBE_BOARD_TMP/skills/." "$CODEX_SKILLS_DIR/"
+rm -rf "$VIBE_BOARD_TMP"
+```
+
+To install the skills globally instead, use `~/.codex/skills` as the target directory:
+
+```bash
+CODEX_SKILLS_DIR="$HOME/.codex/skills"
+VIBE_BOARD_TMP="$(mktemp -d)"
+
+mkdir -p "$CODEX_SKILLS_DIR"
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/siyryu/vibe-board.git "$VIBE_BOARD_TMP"
+git -C "$VIBE_BOARD_TMP" sparse-checkout set skills
+cp -R "$VIBE_BOARD_TMP/skills/." "$CODEX_SKILLS_DIR/"
+rm -rf "$VIBE_BOARD_TMP"
+```
+
+Run the TUI from a repository root:
+
+```bash
+vibe-board
+```
+
+### Developer install
+
+Use the developer install when you want to modify the TUI or the Vibe Board skills locally.
+
+```bash
+VIBE_BOARD_REPO="$HOME/Developer/vibe-board"
+TARGET_REPO="/path/to/your-repo"
+CODEX_SKILLS_DIR="$TARGET_REPO/.codex/skills"
+
+git clone https://github.com/siyryu/vibe-board.git "$VIBE_BOARD_REPO"
+uv tool install --force --editable "$VIBE_BOARD_REPO"
+
+mkdir -p "$CODEX_SKILLS_DIR"
+find "$VIBE_BOARD_REPO/skills" -mindepth 1 -maxdepth 1 \
+  -exec ln -s {} "$CODEX_SKILLS_DIR" \;
+```
+
+For a global developer skill install, set `CODEX_SKILLS_DIR="$HOME/.codex/skills"`.
+
+The developer install uses symlinks instead of copying files, so changes made under `$VIBE_BOARD_REPO/skills` are visible to Codex without reinstalling the skills.
+
+## Usage
+
+For local development of this repository, install it in editable mode:
 
 ```bash
 pip install -e .
