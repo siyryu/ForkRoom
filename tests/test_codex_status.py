@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from vibe_board.codex_status import (
+from forkroom.codex_status import (
     CodexStatusError,
     CodexRunInfo,
     codex_status_commands,
@@ -81,13 +81,13 @@ class CodexStatusTests(unittest.TestCase):
         self.assertEqual(dedupe_thread_ids([" one ", "", "two", "one"]), ["one", "two"])
 
     def test_skips_proxy_when_default_socket_is_missing(self) -> None:
-        with patch.dict("os.environ", {}, clear=True), patch("vibe_board.codex_status.DEFAULT_CONTROL_SOCKET") as socket:
+        with patch.dict("os.environ", {}, clear=True), patch("forkroom.codex_status.DEFAULT_CONTROL_SOCKET") as socket:
             socket.exists.return_value = False
 
             self.assertEqual(codex_status_commands("codex"), [["codex", "app-server"]])
 
     def test_uses_explicit_proxy_socket_before_fallback(self) -> None:
-        with patch.dict("os.environ", {"VIBE_BOARD_CODEX_PROXY_SOCK": "/tmp/codex.sock"}, clear=True):
+        with patch.dict("os.environ", {"FORKROOM_CODEX_PROXY_SOCK": "/tmp/codex.sock"}, clear=True):
             self.assertEqual(
                 codex_status_commands("codex"),
                 [
@@ -104,10 +104,10 @@ class CodexStatusTests(unittest.TestCase):
 
             with (
                 patch.dict("os.environ", {}, clear=True),
-                patch("vibe_board.codex_status.shutil.which", return_value=None),
-                patch("vibe_board.codex_status.DEFAULT_CODEX_APP_BIN", codex_bin),
-                patch("vibe_board.codex_status.DEFAULT_CONTROL_SOCKET") as socket,
-                patch("vibe_board.codex_status.load_codex_run_states_with_command") as load_with_command,
+                patch("forkroom.codex_status.shutil.which", return_value=None),
+                patch("forkroom.codex_status.DEFAULT_CODEX_APP_BIN", codex_bin),
+                patch("forkroom.codex_status.DEFAULT_CONTROL_SOCKET") as socket,
+                patch("forkroom.codex_status.load_codex_run_states_with_command") as load_with_command,
             ):
                 socket.exists.return_value = False
                 load_with_command.return_value = {"thread-1": "active"}

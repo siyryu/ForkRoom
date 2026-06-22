@@ -47,7 +47,7 @@ def load_codex_run_states(thread_ids: Sequence[str], timeout_seconds: float = 4.
 
 def codex_status_commands(codex_bin: str) -> List[List[str]]:
     commands: List[List[str]] = []
-    proxy_socket = os.environ.get("VIBE_BOARD_CODEX_PROXY_SOCK")
+    proxy_socket = os.environ.get("FORKROOM_CODEX_PROXY_SOCK")
     if proxy_socket:
         commands.append([codex_bin, "app-server", "proxy", "--sock", proxy_socket])
     elif DEFAULT_CONTROL_SOCKET.exists():
@@ -57,7 +57,7 @@ def codex_status_commands(codex_bin: str) -> List[List[str]]:
 
 
 def resolve_codex_bin() -> str:
-    configured = os.environ.get("VIBE_BOARD_CODEX_BIN")
+    configured = os.environ.get("FORKROOM_CODEX_BIN")
     if configured:
         return configured
     discovered = shutil.which("codex")
@@ -90,8 +90,8 @@ def load_codex_run_states_with_command(
                 "id": 1,
                 "params": {
                     "clientInfo": {
-                        "name": "vibe_board",
-                        "title": "Vibe Board",
+                        "name": "forkroom",
+                        "title": "ForkRoom",
                         "version": "0.1.0",
                     },
                     "capabilities": {"experimentalApi": True},

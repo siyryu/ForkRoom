@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from vibe_board.init_experiment import InitExperimentError, init_experiment, main, branch_exists
+from forkroom.init_experiment import InitExperimentError, init_experiment, main, branch_exists
 
 
 FIXED_TIME = "2026-06-15T10:00:00+08:00"

@@ -1,6 +1,6 @@
 # Python Run Update Template
 
-Use this inside temporary Python scaffolding when a run was already created with `vibe-board run start`.
+Use this inside temporary Python scaffolding when a run was already created with `forkroom run start`.
 
 ```python
 import json
@@ -14,7 +14,7 @@ TERMINAL = {"succeeded", "failed", "canceled"}
 NON_TERMINAL = {"pending", "running", "waiting"}
 
 
-def update_vibe_run(run_file: str, status: str, completed: Optional[int], total: Optional[int], message: str, estimated_end_at: str = "") -> None:
+def update_forkroom_run(run_file: str, status: str, completed: Optional[int], total: Optional[int], message: str, estimated_end_at: str = "") -> None:
     path = Path(run_file)
     run = json.loads(path.read_text(encoding="utf-8"))
     if run.get("status") in TERMINAL:
@@ -60,5 +60,5 @@ def update_vibe_run(run_file: str, status: str, completed: Optional[int], total:
 Call it from a loop:
 
 ```python
-update_vibe_run(".agents/exps/<exp-id>/runs/<run-id>.json", "running", 450, 1000, "Processed 450/1000 rows", "2026-06-22T18:30:00+08:00")
+update_forkroom_run(".agents/exps/<exp-id>/runs/<run-id>.json", "running", 450, 1000, "Processed 450/1000 rows", "2026-06-22T18:30:00+08:00")
 ```

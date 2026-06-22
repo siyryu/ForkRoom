@@ -1,9 +1,9 @@
 ---
-name: vibe-board:init
-description: Create a new Vibe Board experiment worktree and automatically map local unindexed files (like .env) to the isolated environment.
+name: forkroom:init
+description: Create a new ForkRoom experiment worktree and automatically map local unindexed files (like .env) to the isolated environment.
 ---
 
-# Vibe Board: Initialize Experiment
+# ForkRoom: Initialize Experiment
 
 Use this skill to create a new coding experiment isolated from the main worktree and set up its local environment mapping automatically.
 
@@ -12,7 +12,7 @@ Use this skill to create a new coding experiment isolated from the main worktree
 2. Read `CODEX_THREAD_ID` from the current environment if it is available.
 3. Execute the initializer (delegate to a subagent if requested):
    ```bash
-   vibe-board init \
+   forkroom init \
      --root . \
      --id "<exp-id>" \
      --title "<title>" \
@@ -25,7 +25,7 @@ Use this skill to create a new coding experiment isolated from the main worktree
 
 ## 2. Auto-Map Unindexed Local Files (Map phase)
 After initialization, you must map local unindexed files to ensure the experiment worktree is immediately runnable.
-1. Read `.vibe-board/worktree-map.json`.
+1. Read `.forkroom/worktree-map.json`.
 2. For each rule in the map (containing `source`, `target`, `required`, and `description`):
    - Resolve `source` relative to the main repository root.
    - Resolve `target` relative to the experiment worktree root (`.agents/exps/<exp-id>/worktree/`).

@@ -8,9 +8,9 @@ from rich.padding import Padding
 from rich.spinner import Spinner
 from textual.widgets import DataTable, Static
 
-from vibe_board.api import AgentProvider
-from vibe_board.app import VibeBoardApp
-from vibe_board.codex_focus import CodexFocusSummary
+from forkroom.api import AgentProvider
+from forkroom.app import ForkRoomApp
+from forkroom.codex_focus import CodexFocusSummary
 
 
 class FakeAgentProvider(AgentProvider):
@@ -30,7 +30,7 @@ class AppRunTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_experiment_with_run(root)
-            app = VibeBoardApp(root=root, agent_provider=FakeAgentProvider())
+            app = ForkRoomApp(root=root, agent_provider=FakeAgentProvider())
 
             async with app.run_test() as pilot:
                 await pilot.pause(0.3)

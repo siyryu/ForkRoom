@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Initialize a Vibe Board experiment worktree."""
+"""Initialize a ForkRoom experiment worktree."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from .record_session import RecordSessionError, record_session
 
 
 EXPS_DIR = Path(".agents") / "exps"
-MAP_PATH = Path(".vibe-board") / "worktree-map.json"
+MAP_PATH = Path(".forkroom") / "worktree-map.json"
 ALLOWED_STATUSES = {"draft", "running", "ready", "handoff", "merged", "archived"}
 EXP_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 

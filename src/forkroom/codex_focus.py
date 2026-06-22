@@ -64,8 +64,8 @@ def load_codex_focus_with_command(
                 "id": 1,
                 "params": {
                     "clientInfo": {
-                        "name": "vibe_board_focus",
-                        "title": "Vibe Board Focus",
+                        "name": "forkroom_focus",
+                        "title": "ForkRoom Focus",
                         "version": "0.1.0",
                     },
                     "capabilities": {"experimentalApi": True},

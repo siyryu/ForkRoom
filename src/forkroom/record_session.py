@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record a Codex thread on a Vibe Board experiment manifest."""
+"""Record a Codex thread on a ForkRoom experiment manifest."""
 
 from __future__ import annotations
 

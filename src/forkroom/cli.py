@@ -8,7 +8,7 @@ from . import init_experiment, record_session, runs
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="vibe-board",
+        prog="forkroom",
         description="Read-only TUI and experiment workflow CLI for worktree-backed coding experiments.",
     )
     subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def build_tui_parser(prog: str = "vibe-board") -> argparse.ArgumentParser:
+def build_tui_parser(prog: str = "forkroom") -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=prog,
         description="Read-only TUI for worktree-backed coding experiments.",
@@ -39,21 +39,21 @@ def main(argv: Optional[Sequence[str]] = None) -> Optional[int]:
         build_parser().parse_args(raw_args)
         return 0
     if raw_args and raw_args[0] == "init":
-        return init_experiment.main(raw_args[1:], prog="vibe-board init")
+        return init_experiment.main(raw_args[1:], prog="forkroom init")
     if raw_args and raw_args[0] == "record-session":
-        return record_session.main(raw_args[1:], prog="vibe-board record-session")
+        return record_session.main(raw_args[1:], prog="forkroom record-session")
     if raw_args and raw_args[0] == "run":
-        return runs.main(raw_args[1:], prog="vibe-board run")
+        return runs.main(raw_args[1:], prog="forkroom run")
     if raw_args and raw_args[0] == "tui":
-        return run_tui(raw_args[1:], prog="vibe-board tui")
-    return run_tui(raw_args, prog="vibe-board")
+        return run_tui(raw_args[1:], prog="forkroom tui")
+    return run_tui(raw_args, prog="forkroom")
 
 
 def run_tui(argv: Sequence[str], prog: str) -> None:
-    from .app import VibeBoardApp
+    from .app import ForkRoomApp
 
     args = build_tui_parser(prog=prog).parse_args(argv)
-    app = VibeBoardApp(roots=resolve_tui_roots(args.root))
+    app = ForkRoomApp(roots=resolve_tui_roots(args.root))
     app.run()
     return None
 

@@ -1,12 +1,12 @@
-# Vibe Board
+# ForkRoom
 
-Vibe Board is a read-only terminal dashboard for worktree-backed agent coding experiments.
+ForkRoom is a read-only terminal dashboard for worktree-backed agent coding experiments.
 
 ## Quick install
 
-Vibe Board has two install paths:
+ForkRoom has two install paths:
 
-- **Standard install (recommended)** installs the TUI from GitHub with `uv`, then copies the Codex skills into the repository where you want to use Vibe Board.
+- **Standard install (recommended)** installs the TUI from GitHub with `uv`, then copies the Codex skills into the repository where you want to use ForkRoom.
 - **Developer install** clones this repository locally and symlinks the skills into another repository, so skill edits in the clone are reflected immediately in the installed skill.
 
 ### Standard install (recommended)
@@ -14,64 +14,64 @@ Vibe Board has two install paths:
 Install the TUI from GitHub:
 
 ```bash
-uv tool install "git+https://github.com/siyryu/vibe-board.git"
+uv tool install "git+https://github.com/siyryu/forkroom.git"
 ```
 
-Then install the skills into the repository where Codex should use Vibe Board:
+Then install the skills into the repository where Codex should use ForkRoom:
 
 ```bash
 cd /path/to/your-repo
 CODEX_SKILLS_DIR="$PWD/.codex/skills"
-VIBE_BOARD_TMP="$(mktemp -d)"
+FORKROOM_TMP="$(mktemp -d)"
 
 mkdir -p "$CODEX_SKILLS_DIR"
 git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/siyryu/vibe-board.git "$VIBE_BOARD_TMP"
-git -C "$VIBE_BOARD_TMP" sparse-checkout set skills
-cp -R "$VIBE_BOARD_TMP/skills/." "$CODEX_SKILLS_DIR/"
-rm -rf "$VIBE_BOARD_TMP"
+  https://github.com/siyryu/forkroom.git "$FORKROOM_TMP"
+git -C "$FORKROOM_TMP" sparse-checkout set skills
+cp -R "$FORKROOM_TMP/skills/." "$CODEX_SKILLS_DIR/"
+rm -rf "$FORKROOM_TMP"
 ```
 
 To install the skills globally instead, use `~/.codex/skills` as the target directory:
 
 ```bash
 CODEX_SKILLS_DIR="$HOME/.codex/skills"
-VIBE_BOARD_TMP="$(mktemp -d)"
+FORKROOM_TMP="$(mktemp -d)"
 
 mkdir -p "$CODEX_SKILLS_DIR"
 git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/siyryu/vibe-board.git "$VIBE_BOARD_TMP"
-git -C "$VIBE_BOARD_TMP" sparse-checkout set skills
-cp -R "$VIBE_BOARD_TMP/skills/." "$CODEX_SKILLS_DIR/"
-rm -rf "$VIBE_BOARD_TMP"
+  https://github.com/siyryu/forkroom.git "$FORKROOM_TMP"
+git -C "$FORKROOM_TMP" sparse-checkout set skills
+cp -R "$FORKROOM_TMP/skills/." "$CODEX_SKILLS_DIR/"
+rm -rf "$FORKROOM_TMP"
 ```
 
 Run the TUI from a repository root:
 
 ```bash
-vibe-board
+forkroom
 ```
 
 ### Developer install
 
-Use the developer install when you want to modify the TUI or the Vibe Board skills locally.
+Use the developer install when you want to modify the TUI or the ForkRoom skills locally.
 
 ```bash
-VIBE_BOARD_REPO="$HOME/Developer/vibe-board"
+FORKROOM_REPO="$HOME/Developer/forkroom"
 TARGET_REPO="/path/to/your-repo"
 CODEX_SKILLS_DIR="$TARGET_REPO/.codex/skills"
 
-git clone https://github.com/siyryu/vibe-board.git "$VIBE_BOARD_REPO"
-uv tool install --force --editable "$VIBE_BOARD_REPO"
+git clone https://github.com/siyryu/forkroom.git "$FORKROOM_REPO"
+uv tool install --force --editable "$FORKROOM_REPO"
 
 mkdir -p "$CODEX_SKILLS_DIR"
-find "$VIBE_BOARD_REPO/skills" -mindepth 1 -maxdepth 1 \
+find "$FORKROOM_REPO/skills" -mindepth 1 -maxdepth 1 \
   -exec ln -s {} "$CODEX_SKILLS_DIR" \;
 ```
 
 For a global developer skill install, set `CODEX_SKILLS_DIR="$HOME/.codex/skills"`.
 
-The developer install uses symlinks instead of copying files, so changes made under `$VIBE_BOARD_REPO/skills` are visible to Codex without reinstalling the skills.
+The developer install uses symlinks instead of copying files, so changes made under `$FORKROOM_REPO/skills` are visible to Codex without reinstalling the skills.
 
 ## Usage
 
@@ -79,7 +79,7 @@ For local development of this repository, install it in editable mode:
 
 ```bash
 pip install -e .
-vibe-board
+forkroom
 ```
 
 The dashboard refreshes automatically every two seconds. Press `r` to refresh on demand.
@@ -89,31 +89,31 @@ When a session is highlighted, the preview panel bolds the latest user command a
 Long Codex updates are fitted to the preview panel height, with the final ellipsis line included in that height budget.
 Press `Esc` to return focus to the experiments table.
 
-The experiments table shows an animated indicator next to any experiment with a recorded session that is active or waiting on approval. The sessions table shows the specific `Run` state for each recorded Codex thread. Vibe Board queries the local Codex App Server and falls back to `unknown` if Codex is unavailable, times out, or cannot read a thread.
+The experiments table shows an animated indicator next to any experiment with a recorded session that is active or waiting on approval. The sessions table shows the specific `Run` state for each recorded Codex thread. ForkRoom queries the local Codex App Server and falls back to `unknown` if Codex is unavailable, times out, or cannot read a thread.
 The preview panel uses the same local App Server and shows visible session activity only; it does not expose shell/tool command lines or replace opening the full Codex thread for details.
 
-Vibe Board resolves `codex` from `PATH`, then falls back to the macOS Codex.app bundle. Set `VIBE_BOARD_CODEX_BIN` to override the executable path.
+ForkRoom resolves `codex` from `PATH`, then falls back to the macOS Codex.app bundle. Set `FORKROOM_CODEX_BIN` to override the executable path.
 
 Or point it at a repository:
 
 ```bash
-vibe-board --root /path/to/repo
+forkroom --root /path/to/repo
 ```
 
 Or preview experiments across multiple repositories in one board:
 
 ```bash
-vibe-board --root /path/to/repo-a --root /path/to/repo-b
+forkroom --root /path/to/repo-a --root /path/to/repo-b
 ```
 
-When multiple roots are provided, Vibe Board merges experiments into one table, adds a `Project` column, and sorts the combined list by most recently updated experiment.
+When multiple roots are provided, ForkRoom merges experiments into one table, adds a `Project` column, and sorts the combined list by most recently updated experiment.
 
-The TUI does not create experiments, worktrees, symlinks, commits, or handoffs. Those workflows are handled by CLI subcommands and the `skills/vibe-board` skill.
+The TUI does not create experiments, worktrees, symlinks, commits, or handoffs. Those workflows are handled by CLI subcommands and the `skills/forkroom` skill.
 
 Create an experiment with the deterministic initializer:
 
 ```bash
-vibe-board init \
+forkroom init \
   --root . \
   --id my-experiment \
   --title "My Experiment" \
@@ -123,7 +123,7 @@ vibe-board init \
   --status running
 ```
 
-The initializer validates the repository, checks for experiment/branch/worktree conflicts, creates the experiment directories, branch, and worktree, writes `manifest.json`, records the Codex session when `--thread-id` is provided, applies `.vibe-board/worktree-map.json`, and prints structured JSON. It does not create `plan.md`; write a plan only when a user asks for one or enters Plan mode.
+The initializer validates the repository, checks for experiment/branch/worktree conflicts, creates the experiment directories, branch, and worktree, writes `manifest.json`, records the Codex session when `--thread-id` is provided, applies `.forkroom/worktree-map.json`, and prints structured JSON. It does not create `plan.md`; write a plan only when a user asks for one or enters Plan mode.
 
 Experiments can record the Codex conversations that belong to them in `manifest.json`:
 
@@ -144,12 +144,12 @@ Experiments can record the Codex conversations that belong to them in `manifest.
 }
 ```
 
-`sessions` is optional. If a session entry omits `deeplink`, Vibe Board derives `codex://threads/<id>`. A session should appear in exactly one experiment; duplicate ownership is reported as an experiment warning. The manifest `status` field is metadata only; the TUI's `Run` column comes from Codex runtime state.
+`sessions` is optional. If a session entry omits `deeplink`, ForkRoom derives `codex://threads/<id>`. A session should appear in exactly one experiment; duplicate ownership is reported as an experiment warning. The manifest `status` field is metadata only; the TUI's `Run` column comes from Codex runtime state.
 
 Record a Codex session on an experiment manifest with:
 
 ```bash
-vibe-board record-session \
+forkroom record-session \
   --root . \
   --exp my-experiment \
   --thread-id 019e7831-63b8-7ca2-a4f7-47593e2846ea \
@@ -159,12 +159,12 @@ vibe-board record-session \
 
 The command appends or updates the session in `.agents/exps/<exp-id>/manifest.json`, fills default metadata, derives the Codex deeplink when omitted, and rejects session ids already owned by another experiment.
 
-`vibe-board init` and `vibe-board record-session` intentionally operate on one `--root` at a time, even though the TUI can preview multiple roots.
+`forkroom init` and `forkroom record-session` intentionally operate on one `--root` at a time, even though the TUI can preview multiple roots.
 
 Track long-running work with an experiment run:
 
 ```bash
-vibe-board run start \
+forkroom run start \
   --root . \
   --exp my-experiment \
   --id train-model \
@@ -180,7 +180,7 @@ Each run is stored as `.agents/exps/<exp-id>/runs/<run-id>.json` and belongs to 
 Every non-terminal update must refresh the ETA:
 
 ```bash
-vibe-board run update \
+forkroom run update \
   --root . \
   --exp my-experiment \
   --id train-model \
@@ -194,9 +194,9 @@ vibe-board run update \
 Finish exactly once:
 
 ```bash
-vibe-board run succeed --root . --exp my-experiment --id train-model --message "Training complete"
+forkroom run succeed --root . --exp my-experiment --id train-model --message "Training complete"
 ```
 
-For temporary scaffolding inside an experiment worktree, use `skills/vibe-board-run.md` and the Shell, Python, or Node templates under `skills/vibe-board-run/templates/`. Templates directly update an existing run JSON file and append events; they do not create runs, so the session uniqueness check stays centralized in `vibe-board run start`.
+For temporary scaffolding inside an experiment worktree, use `skills/forkroom-run.md` and the Shell, Python, or Node templates under `skills/forkroom-run/templates/`. Templates directly update an existing run JSON file and append events; they do not create runs, so the session uniqueness check stays centralized in `forkroom run start`.
 
-The legacy `python3 scripts/init_experiment.py` and `python3 scripts/record_session.py` entry points remain as compatibility wrappers when working from the Vibe Board source tree.
+The legacy `python3 scripts/init_experiment.py` and `python3 scripts/record_session.py` entry points remain as compatibility wrappers when working from the ForkRoom source tree.

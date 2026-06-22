@@ -1,11 +1,11 @@
 ---
-name: vibe-board:record
+name: forkroom:record
 description: Bind the current AI session to an existing experiment. Triggered when the user pastes experiment info copied via the TUI 'c' shortcut.
 ---
 
-# Vibe Board: Record Session
+# ForkRoom: Record Session
 
-Use this skill when the user pastes experiment information (usually copied from the Vibe Board TUI using the `c` shortcut) and wants to associate the current AI conversation with that experiment.
+Use this skill when the user pastes experiment information (usually copied from the ForkRoom TUI using the `c` shortcut) and wants to associate the current AI conversation with that experiment.
 
 ## Steps
 
@@ -13,7 +13,7 @@ Use this skill when the user pastes experiment information (usually copied from 
 2. **Identify Session**: Read `CODEX_THREAD_ID` from the current environment to get the `<codex-thread-id>`. If it is unavailable, warn the user that the session ID cannot be automatically determined.
 3. **Record**: Run the following command to bind the session:
    ```bash
-   vibe-board record-session \
+   forkroom record-session \
      --root . \
      --exp "<exp-id>" \
      --thread-id "<codex-thread-id>" \

@@ -1,6 +1,6 @@
 import unittest
 
-from vibe_board.codex_focus import summarize_codex_focus
+from forkroom.codex_focus import summarize_codex_focus
 
 
 class CodexFocusTests(unittest.TestCase):

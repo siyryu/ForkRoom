@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from vibe_board.time_format import friendly_time
+from forkroom.time_format import friendly_time
 
 
 NOW = datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc)

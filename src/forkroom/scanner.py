@@ -14,7 +14,7 @@ from .runs import ACTIVE_RUN_STATUSES, validate_count_value, validate_run_events
 
 
 EXPS_DIR = Path(".agents") / "exps"
-MAP_PATH = Path(".vibe-board") / "worktree-map.json"
+MAP_PATH = Path(".forkroom") / "worktree-map.json"
 
 
 def scan_repository(root: Path) -> Snapshot:

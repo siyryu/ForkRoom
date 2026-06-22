@@ -1,6 +1,6 @@
 # Node Run Update Template
 
-Use this inside temporary Node.js scaffolding when a run was already created with `vibe-board run start`.
+Use this inside temporary Node.js scaffolding when a run was already created with `forkroom run start`.
 
 ```js
 const fs = require("fs");
@@ -8,7 +8,7 @@ const fs = require("fs");
 const TERMINAL = new Set(["succeeded", "failed", "canceled"]);
 const NON_TERMINAL = new Set(["pending", "running", "waiting"]);
 
-function updateVibeRun(runFile, status, completed, total, message, estimatedEndAt = "") {
+function updateForkRoomRun(runFile, status, completed, total, message, estimatedEndAt = "") {
   const run = JSON.parse(fs.readFileSync(runFile, "utf8"));
   if (TERMINAL.has(run.status)) {
     throw new Error("terminal run cannot be updated");
@@ -61,5 +61,5 @@ function updateVibeRun(runFile, status, completed, total, message, estimatedEndA
 Call it from a loop:
 
 ```js
-updateVibeRun(".agents/exps/<exp-id>/runs/<run-id>.json", "running", 45, 100, "Processed 45/100 items", "2026-06-22T18:30:00+08:00");
+updateForkRoomRun(".agents/exps/<exp-id>/runs/<run-id>.json", "running", 45, 100, "Processed 45/100 items", "2026-06-22T18:30:00+08:00");
 ```

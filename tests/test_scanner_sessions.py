@@ -5,7 +5,7 @@ from pathlib import Path
 
 from helpers import git, init_repo
 
-from vibe_board.scanner import codex_thread_deeplink, load_experiments, load_sessions, scan_repositories
+from forkroom.scanner import codex_thread_deeplink, load_experiments, load_sessions, scan_repositories
 
 
 class ScannerSessionTests(unittest.TestCase):

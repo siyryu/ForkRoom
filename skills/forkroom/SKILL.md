@@ -1,11 +1,11 @@
 ---
-name: vibe-board
-description: Main entry point and global guardrails for Vibe Board coding experiments. Use this to understand the experiment layout, strict worktree isolation rules, and available sub-commands (init, record, merge).
+name: forkroom
+description: Main entry point and global guardrails for ForkRoom coding experiments. Use this to understand the experiment layout, strict worktree isolation rules, and available sub-commands (init, record, merge).
 ---
 
-# Vibe Board: Global Guardrails & Overview
+# ForkRoom: Global Guardrails & Overview
 
-This is the central routing and guardrail skill for Vibe Board experiments. Vibe Board manages coding experiments backed by Git worktrees to keep experimental agent work isolated from the main repository.
+This is the central routing and guardrail skill for ForkRoom experiments. ForkRoom manages coding experiments backed by Git worktrees to keep experimental agent work isolated from the main repository.
 
 ## 🚦 Strict Worktree Context Guardrails (CRITICAL)
 
@@ -35,13 +35,13 @@ Every experiment follows this structure:
 
 Instead of executing the entire lifecycle manually, delegate tasks to the following specialized skills based on the user's request:
 
-*   **`vibe-board-init`**
-    Use when starting a new experiment. It handles `vibe-board init` to create the worktree, branch, and manifest, and automatically sets up local unindexed file symlinks (mapping).
-*   **`vibe-board-record`**
+*   **`forkroom-init`**
+    Use when starting a new experiment. It handles `forkroom init` to create the worktree, branch, and manifest, and automatically sets up local unindexed file symlinks (mapping).
+*   **`forkroom-record`**
     Use when the user pastes text containing an experiment ID (usually copied via the TUI's 'c' shortcut) to quickly bind the current AI session to that experiment.
-*   **`vibe-board-run`**
-    Use when a long-running task needs tracked progress, ETA updates, and strict lifecycle management. It handles `vibe-board run` plus template-based progress updates inside temporary scaffolding.
-*   **`vibe-board-merge`**
+*   **`forkroom-run`**
+    Use when a long-running task needs tracked progress, ETA updates, and strict lifecycle management. It handles `forkroom run` plus template-based progress updates inside temporary scaffolding.
+*   **`forkroom-merge`**
     Use when an experiment is finished and needs to be merged back into the main repository. It uses a subagent to selectively port ONLY the core solution (discarding scaffolding), commits the changes, and generates a handoff document.
 
 *(If the user's request matches one of these specific actions, directly invoke the corresponding skill.)*

@@ -4,7 +4,7 @@ from helpers import init_repo, git
 import subprocess
 from pathlib import Path
 
-from vibe_board.cli import build_tui_parser, main, resolve_tui_roots
+from forkroom.cli import build_tui_parser, main, resolve_tui_roots
 
 
 FIXED_TIME = "2026-06-15T10:00:00+08:00"

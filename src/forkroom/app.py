@@ -35,7 +35,7 @@ class NoHoverDataTable(DataTable):
     def _update_hover_cursor(self) -> None:
         self._show_hover_cursor = False
 
-class VibeBoardApp(App):
+class ForkRoomApp(App):
     """Read-only dashboard for worktree-backed experiments."""
 
     AUTO_REFRESH_SECONDS = 2.0

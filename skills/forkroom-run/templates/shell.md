@@ -1,9 +1,9 @@
 # Shell Run Update Template
 
-Use this inside temporary shell scaffolding when a run was already created with `vibe-board run start`.
+Use this inside temporary shell scaffolding when a run was already created with `forkroom run start`.
 
 ```bash
-update_vibe_run() {
+update_forkroom_run() {
   run_file="$1"
   status="$2"
   completed="$3"
@@ -67,5 +67,5 @@ PY
 Call it from a loop:
 
 ```bash
-update_vibe_run ".agents/exps/<exp-id>/runs/<run-id>.json" running 45 100 "Processed 45/100 items" "2026-06-22T18:30:00+08:00"
+update_forkroom_run ".agents/exps/<exp-id>/runs/<run-id>.json" running 45 100 "Processed 45/100 items" "2026-06-22T18:30:00+08:00"
 ```

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manage Vibe Board long-running task records."""
+"""Manage ForkRoom long-running task records."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ class RunError(Exception):
 def build_parser(prog: Optional[str] = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=prog,
-        description="Create and update tracked Vibe Board runs.",
+        description="Create and update tracked ForkRoom runs.",
     )
     subparsers = parser.add_subparsers(dest="action", metavar="ACTION", required=True)
 

@@ -1,9 +1,9 @@
 ---
-name: vibe-board:merge
+name: forkroom:merge
 description: Selectively port core experiment code to the main worktree, utilizing a subagent to filter out scaffolding/temp code, then commit and generate a handoff.
 ---
 
-# Vibe Board: Selective Merge & Handoff
+# ForkRoom: Selective Merge & Handoff
 
 Use this skill when an experiment is completed and needs to be merged back into the main repository. 
 
@@ -27,7 +27,7 @@ Before making any changes to the main worktree, you MUST spawn a subagent using 
 ## 3. Commit
 1. Stage ONLY the specific files you modified in the main worktree: `git add <file1> <file2>` (Do not use `git add .`).
 2. Commit the changes using the message drafted by the subagent. Ensure the commit message includes the experiment ID suffix. For example:
-   `git commit -m "feat: <description> [Vibe-Board: <exp-id>]"`
+   `git commit -m "feat: <description> [ForkRoom: <exp-id>]"`
 3. Retrieve the newly created Commit ID:
    `git rev-parse HEAD`
 

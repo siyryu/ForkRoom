@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 
 from helpers import git, init_repo
-from vibe_board.cli import main as cli_main
-from vibe_board.runs import parse_eta
-from vibe_board.scanner import scan_repositories
+from forkroom.cli import main as cli_main
+from forkroom.runs import parse_eta
+from forkroom.scanner import scan_repositories
 
 
 FIXED_TIME = "2026-06-15T10:00:00+08:00"

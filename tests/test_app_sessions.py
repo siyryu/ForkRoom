@@ -9,9 +9,9 @@ from rich.padding import Padding
 from rich.spinner import Spinner
 from textual.widgets import DataTable, Static
 
-from vibe_board.app import VibeBoardApp
-from vibe_board.api import AgentProvider
-from vibe_board.codex_focus import CodexFocusSummary
+from forkroom.app import ForkRoomApp
+from forkroom.api import AgentProvider
+from forkroom.codex_focus import CodexFocusSummary
 from typing import Sequence, Dict, Callable
 
 class FakeAgentProvider(AgentProvider):
@@ -25,7 +25,7 @@ class FakeAgentProvider(AgentProvider):
     def get_focus(self, session_id: str, timeout_seconds: float = 4.0) -> CodexFocusSummary:
         return self.focus_loader(session_id)
 
-from vibe_board.codex_focus import CodexFocusSummary
+from forkroom.codex_focus import CodexFocusSummary
 
 
 def column_labels(table: DataTable) -> list[str]:
@@ -101,7 +101,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 ],
             )
 
-            app = VibeBoardApp(
+            app = ForkRoomApp(
                 root=root,
                 agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "completed" for session_id in ids}, focus_loader=make_focus_loader("completed")),
             )
@@ -142,7 +142,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 app.render_experiment_run_indicators()
                 self.assertIs(app.focused, sessions)
 
-                with patch("vibe_board.app.webbrowser.open", return_value=True) as open_url:
+                with patch("forkroom.app.webbrowser.open", return_value=True) as open_url:
                     await pilot.press("enter")
                     await pilot.pause(0.2)
 
@@ -151,7 +151,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
     async def test_codex_preview_fits_update_to_available_height(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            app = VibeBoardApp(root=root)
+            app = ForkRoomApp(root=root)
             summary = CodexFocusSummary(
                 thread_id="session-1",
                 state="active",
@@ -178,7 +178,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
-            app = VibeBoardApp(
+            app = ForkRoomApp(
                 root=root,
                 agent_provider=FakeAgentProvider(run_loader=lambda ids: {"session-1": "active"}, focus_loader=make_focus_loader("active")),
             )
@@ -204,7 +204,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                     {"id": "session-b", "title": "Session B"},
                 ],
             )
-            app = VibeBoardApp(
+            app = ForkRoomApp(
                 root=root,
                 agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "active" for session_id in ids}, focus_loader=make_focus_loader("active")),
             )
@@ -230,7 +230,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(run_state=run_state), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
-                app = VibeBoardApp(
+                app = ForkRoomApp(
                     root=root,
                     agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: run_state for session_id in ids}, focus_loader=make_focus_loader(run_state)),
                 )
@@ -248,7 +248,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(run_state=run_state), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 write_experiment(root, sessions=[{"id": "session-1", "title": "Demo session"}])
-                app = VibeBoardApp(
+                app = ForkRoomApp(
                     root=root,
                     agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: run_state for session_id in ids}, focus_loader=make_focus_loader(run_state)),
                 )
@@ -263,7 +263,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_experiment(root, sessions=None)
-            app = VibeBoardApp(
+            app = ForkRoomApp(
                 root=root,
                 agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "active" for session_id in ids}, focus_loader=make_focus_loader("active")),
             )
@@ -283,7 +283,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             root_b = Path(tmp) / "beta"
             write_experiment(root_a, sessions=[{"id": "session-a"}], updated_at="2026-06-15T10:00:00+08:00")
             write_experiment(root_b, sessions=[{"id": "session-b"}], updated_at="2026-06-15T12:00:00+08:00")
-            app = VibeBoardApp(
+            app = ForkRoomApp(
                 roots=[root_a, root_b],
                 agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "completed" for session_id in ids}, focus_loader=make_focus_loader("completed")),
             )
@@ -306,7 +306,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
             root_b = Path(tmp) / "beta"
             write_experiment(root_a, sessions=[{"id": "session-a"}], updated_at="2026-06-15T10:00:00+08:00")
             write_experiment(root_b, sessions=[{"id": "session-b"}], updated_at="2026-06-15T11:00:00+08:00")
-            app = VibeBoardApp(
+            app = ForkRoomApp(
                 roots=[root_a, root_b],
                 agent_provider=FakeAgentProvider(run_loader=lambda ids: {session_id: "active" for session_id in ids}, focus_loader=make_focus_loader("active")),
             )
@@ -332,7 +332,7 @@ class AppSessionTests(unittest.IsolatedAsyncioTestCase):
                 loaded_ids.append(tuple(ids))
                 return {session_id: "completed" for session_id in ids}
 
-            app = VibeBoardApp(
+            app = ForkRoomApp(
                 roots=[root_a, root_b],
                 agent_provider=FakeAgentProvider(run_loader=load_runs, focus_loader=make_focus_loader("completed")),
             )

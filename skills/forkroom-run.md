@@ -1,9 +1,9 @@
 ---
-name: vibe-board:run
-description: Track a long-running Vibe Board run with strict lifecycle updates, ETA refreshes, and optional template-based progress writes.
+name: forkroom:run
+description: Track a long-running ForkRoom run with strict lifecycle updates, ETA refreshes, and optional template-based progress writes.
 ---
 
-# Vibe Board: Track a Run
+# ForkRoom: Track a Run
 
 Use this skill when a task will take long enough that the user benefits from progress, status, and ETA updates. Examples include package installation, model training, plan execution, migrations, crawlers, test sweeps, or any loop that produces incremental progress.
 
@@ -11,7 +11,7 @@ Use this skill when a task will take long enough that the user benefits from pro
 
 1. Create or bind the current session's only active run:
    ```bash
-   vibe-board run start \
+   forkroom run start \
      --root . \
      --exp "<exp-id>" \
      --id "<run-id>" \
@@ -21,11 +21,11 @@ Use this skill when a task will take long enough that the user benefits from pro
      --total "<total-items>" \
      --message "Starting"
    ```
-   `vibe-board run start` reads `CODEX_THREAD_ID` by default. Pass `--session-id` only when the environment does not provide it.
+   `forkroom run start` reads `CODEX_THREAD_ID` by default. Pass `--session-id` only when the environment does not provide it.
 2. Start a dedicated progress-tracking subagent by default. Its sole job is to watch the long-running task and update the run.
 3. Every non-terminal update must refresh `estimated_end_at`:
    ```bash
-   vibe-board run update \
+   forkroom run update \
      --root . \
      --exp "<exp-id>" \
      --id "<run-id>" \
@@ -36,7 +36,7 @@ Use this skill when a task will take long enough that the user benefits from pro
    ```
 4. Finish with exactly one terminal state:
    ```bash
-   vibe-board run succeed --root . --exp "<exp-id>" --id "<run-id>" --message "Completed"
+   forkroom run succeed --root . --exp "<exp-id>" --id "<run-id>" --message "Completed"
    ```
    Use `fail` for errors and `cancel` for intentional stops.
 
@@ -50,7 +50,7 @@ Use this skill when a task will take long enough that the user benefits from pro
 
 ## Template Selection
 
-Use the templates in `skills/vibe-board-run/templates/` when writing temporary scaffold code inside an experiment worktree:
+Use the templates in `skills/forkroom-run/templates/` when writing temporary scaffold code inside an experiment worktree:
 
 - `shell.md` for shell scripts and installation loops.
 - `python.md` for training, ETL, crawling, or data-processing loops.

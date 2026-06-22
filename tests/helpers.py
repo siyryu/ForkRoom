@@ -38,7 +38,7 @@ def init_repo(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
     if map_config is not None:
-        agents_dir = root / ".vibe-board"
+        agents_dir = root / ".forkroom"
         agents_dir.mkdir(parents=True, exist_ok=True)
         (agents_dir / "worktree-map.json").write_text(json.dumps(map_config), encoding="utf-8")
 
