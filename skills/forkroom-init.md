@@ -28,13 +28,13 @@ After initialization, you must map local unindexed files to ensure the experimen
 1. Read `.forkroom/worktree-map.json`.
 2. For each rule in the map (containing `source`, `target`, `required`, and `description`):
    - Resolve `source` relative to the main repository root.
-   - Resolve `target` relative to the experiment worktree root (`.agents/exps/<exp-id>/worktree/`).
+   - Resolve `target` relative to the experiment worktree root (`.forkroom/exps/<exp-id>/worktree/`).
    - If `source` is missing and `required` is true, stop and report the missing local prerequisite.
    - If `target` already exists, report the conflict and skip.
-   - Create an absolute symlink: `ln -s "$(pwd)/<source>" ".agents/exps/<exp-id>/worktree/<target>"`
+   - Create an absolute symlink: `ln -s "$(pwd)/<source>" ".forkroom/exps/<exp-id>/worktree/<target>"`
 3. Do NOT read, print, or commit the contents of secret files (e.g., `.env`, `*.pem`).
 
 ## Guardrails
-- **All code changes for this experiment must happen inside `.agents/exps/<exp-id>/worktree`.**
+- **All code changes for this experiment must happen inside `.forkroom/exps/<exp-id>/worktree`.**
 - Do not create a `plan.md` unless explicitly asked.
 - Provide a concise summary of the created experiment and mapped files to the user.

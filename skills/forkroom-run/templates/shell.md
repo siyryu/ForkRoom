@@ -67,5 +67,5 @@ PY
 Call it from a loop:
 
 ```bash
-update_forkroom_run ".agents/exps/<exp-id>/runs/<run-id>.json" running 45 100 "Processed 45/100 items" "2026-06-22T18:30:00+08:00"
+update_forkroom_run ".forkroom/exps/<exp-id>/runs/<run-id>.json" running 45 100 "Processed 45/100 items" "2026-06-22T18:30:00+08:00"
 ```

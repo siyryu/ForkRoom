@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from .time_format import _parse_timestamp
 
 
-EXPS_DIR = Path(".agents") / "exps"
+EXPS_DIR = Path(".forkroom") / "exps"
 RUNS_DIR = "runs"
 RUN_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 RELATIVE_ETA_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([smhdw])\s*$", re.IGNORECASE)
@@ -110,7 +110,7 @@ def build_parser(prog: Optional[str] = None) -> argparse.ArgumentParser:
 
 def add_common_run_args(parser: argparse.ArgumentParser, require_run: bool) -> None:
     parser.add_argument("--root", default=".", help="Repository root. Defaults to the current directory.")
-    parser.add_argument("--exp", required=True, help="Experiment id under .agents/exps.")
+    parser.add_argument("--exp", required=True, help="Experiment id under .forkroom/exps.")
     parser.add_argument("--id", required=require_run, help="Run id under the experiment runs directory.")
 
 

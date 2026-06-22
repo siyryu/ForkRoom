@@ -61,5 +61,5 @@ function updateForkRoomRun(runFile, status, completed, total, message, estimated
 Call it from a loop:
 
 ```js
-updateForkRoomRun(".agents/exps/<exp-id>/runs/<run-id>.json", "running", 45, 100, "Processed 45/100 items", "2026-06-22T18:30:00+08:00");
+updateForkRoomRun(".forkroom/exps/<exp-id>/runs/<run-id>.json", "running", 45, 100, "Processed 45/100 items", "2026-06-22T18:30:00+08:00");
 ```

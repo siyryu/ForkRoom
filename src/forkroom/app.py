@@ -790,7 +790,7 @@ class ForkRoomApp(App):
         if experiment is None:
             lines.extend(["", "No experiment selected."])
             if not snapshot.experiments:
-                lines.append("No experiments found under .agents/exps.")
+                lines.append("No experiments found under .forkroom/exps.")
                 if self.show_project_column:
                     for project in snapshot.projects:
                         lines.append("- {0}: {1}".format(project.name, project.exps_path))

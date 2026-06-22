@@ -78,6 +78,7 @@ htmlcov/
 *.tsbuildinfo
 
 # Local tool state
+.forkroom/exps/
 .agents/exps/
 .codex/
 .claude/

@@ -30,7 +30,7 @@ def init_repo(
         git(root, "config", "user.name", "Test User")
         git(root, "config", "user.email", "test@example.com")
 
-        (root / ".gitignore").write_text(".agents/\n", encoding="utf-8")
+        (root / ".gitignore").write_text(".forkroom/exps/\n", encoding="utf-8")
         (root / "README.md").write_text("# Test Repo\n", encoding="utf-8")
         
     for name, content in (files or {}).items():
@@ -38,9 +38,9 @@ def init_repo(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
     if map_config is not None:
-        agents_dir = root / ".forkroom"
-        agents_dir.mkdir(parents=True, exist_ok=True)
-        (agents_dir / "worktree-map.json").write_text(json.dumps(map_config), encoding="utf-8")
+        forkroom_dir = root / ".forkroom"
+        forkroom_dir.mkdir(parents=True, exist_ok=True)
+        (forkroom_dir / "worktree-map.json").write_text(json.dumps(map_config), encoding="utf-8")
 
     git(root, "add", ".")
     git(root, "commit", "-m", "Initial commit")

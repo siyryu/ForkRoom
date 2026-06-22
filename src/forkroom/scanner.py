@@ -13,7 +13,7 @@ from .models import AgentSession, Experiment, LinkRule, LinkStatus, MapConfig, P
 from .runs import ACTIVE_RUN_STATUSES, validate_count_value, validate_run_events
 
 
-EXPS_DIR = Path(".agents") / "exps"
+EXPS_DIR = Path(".forkroom") / "exps"
 MAP_PATH = Path(".forkroom") / "worktree-map.json"
 
 
@@ -226,7 +226,7 @@ def load_experiment(
 
     title = _string_value(manifest, "title", exp_id)
     status = _string_value(manifest, "status", "unknown")
-    branch = _string_value(manifest, "branch", "agents/{0}".format(exp_id))
+    branch = _string_value(manifest, "branch", "forkroom/{0}".format(exp_id))
     created_at = _string_value(manifest, "created_at", _mtime_text(manifest_path if manifest_exists else exp_path))
     updated_at = _string_value(manifest, "updated_at", _mtime_text(manifest_path if manifest_exists else exp_path))
     summary = _string_value(manifest, "summary", "")

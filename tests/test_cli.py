@@ -32,14 +32,14 @@ def test_cli_init_initializes_experiment(tmp_path: Path, capsys) -> None:
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
-    assert payload["branch"] == "agents/cli-exp"
-    assert payload["paths"]["worktree"] == str(root / ".agents" / "exps" / "cli-exp" / "worktree")
-    assert (root / ".agents" / "exps" / "cli-exp" / "manifest.json").is_file()
+    assert payload["branch"] == "forkroom/cli-exp"
+    assert payload["paths"]["worktree"] == str(root / ".forkroom" / "exps" / "cli-exp" / "worktree")
+    assert (root / ".forkroom" / "exps" / "cli-exp" / "manifest.json").is_file()
 
 
 def test_cli_record_session_updates_manifest(tmp_path: Path, capsys) -> None:
     root = tmp_path / "repo"
-    manifest_path = root / ".agents" / "exps" / "cli-exp" / "manifest.json"
+    manifest_path = root / ".forkroom" / "exps" / "cli-exp" / "manifest.json"
     manifest_path.parent.mkdir(parents=True)
     manifest_path.write_text(json.dumps({"id": "cli-exp", "updated_at": "old"}), encoding="utf-8")
 

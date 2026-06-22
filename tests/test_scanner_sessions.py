@@ -40,8 +40,8 @@ class ScannerSessionTests(unittest.TestCase):
     def test_duplicate_session_ownership_is_reported(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            one = root / ".agents" / "exps" / "one"
-            two = root / ".agents" / "exps" / "two"
+            one = root / ".forkroom" / "exps" / "one"
+            two = root / ".forkroom" / "exps" / "two"
             for exp_path in (one, two):
                 (exp_path / "worktree").mkdir(parents=True)
                 (exp_path / "outputs").mkdir()
@@ -52,7 +52,7 @@ class ScannerSessionTests(unittest.TestCase):
                     {
                         "id": "one",
                         "title": "One",
-                        "branch": "agents/one",
+                        "branch": "forkroom/one",
                         "sessions": [{"id": "shared-session"}],
                     }
                 ),
@@ -63,7 +63,7 @@ class ScannerSessionTests(unittest.TestCase):
                     {
                         "id": "two",
                         "title": "Two",
-                        "branch": "agents/two",
+                        "branch": "forkroom/two",
                         "sessions": [{"id": "shared-session"}],
                     }
                 ),
@@ -74,7 +74,7 @@ class ScannerSessionTests(unittest.TestCase):
                 root,
                 links=[],
                 registered_worktrees={(one / "worktree").resolve(), (two / "worktree").resolve()},
-                branches={"agents/one", "agents/two"},
+                branches={"forkroom/one", "forkroom/two"},
             )
 
         warnings = {experiment.id: "\n".join(experiment.warnings) for experiment in experiments}
@@ -84,7 +84,7 @@ class ScannerSessionTests(unittest.TestCase):
     def test_experiments_are_sorted_by_updated_at_descending(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            exps_root = root / ".agents" / "exps"
+            exps_root = root / ".forkroom" / "exps"
             manifests = {
                 "alpha": "2026-06-15T10:00:00+08:00",
                 "bravo": "2026-06-15T12:00:00+08:00",
@@ -101,7 +101,7 @@ class ScannerSessionTests(unittest.TestCase):
                         {
                             "id": exp_id,
                             "title": exp_id.title(),
-                            "branch": "agents/{0}".format(exp_id),
+                            "branch": "forkroom/{0}".format(exp_id),
                             "updated_at": updated_at,
                         }
                     ),
@@ -112,7 +112,7 @@ class ScannerSessionTests(unittest.TestCase):
                 root,
                 links=[],
                 registered_worktrees={(exps_root / exp_id / "worktree").resolve() for exp_id in manifests},
-                branches={"agents/{0}".format(exp_id) for exp_id in manifests},
+                branches={"forkroom/{0}".format(exp_id) for exp_id in manifests},
             )
 
         self.assertEqual([experiment.id for experiment in experiments], ["bravo", "charlie", "alpha"])
@@ -167,15 +167,15 @@ class ScannerSessionTests(unittest.TestCase):
         updated_at: str,
         sessions: list[object] | None = None,
     ) -> None:
-        git(root, "branch", "agents/{0}".format(exp_id), "HEAD")
-        exp = root / ".agents" / "exps" / exp_id
+        git(root, "branch", "forkroom/{0}".format(exp_id), "HEAD")
+        exp = root / ".forkroom" / "exps" / exp_id
         (exp / "worktree").mkdir(parents=True)
         (exp / "outputs").mkdir()
         (exp / "logs").mkdir()
         manifest: dict[str, object] = {
             "id": exp_id,
             "title": exp_id.title(),
-            "branch": "agents/{0}".format(exp_id),
+            "branch": "forkroom/{0}".format(exp_id),
             "updated_at": updated_at,
         }
         if sessions is not None:

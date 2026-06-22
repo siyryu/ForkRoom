@@ -32,7 +32,7 @@ Before making any changes to the main worktree, you MUST spawn a subagent using 
    `git rev-parse HEAD`
 
 ## 4. Handoff Generation
-Generate or update `.agents/exps/<exp-id>/handoff.md`. The document MUST include:
+Generate or update `.forkroom/exps/<exp-id>/handoff.md`. The document MUST include:
 - The experiment goal.
 - The worktree path and branch name.
 - A summary of the *selectively merged* files (and what was intentionally left behind).

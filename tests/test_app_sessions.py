@@ -65,7 +65,7 @@ def write_experiment(
     exp_id: str = "demo",
     updated_at: str = "",
 ) -> None:
-    exp = root / ".agents" / "exps" / exp_id
+    exp = root / ".forkroom" / "exps" / exp_id
     (exp / "worktree").mkdir(parents=True)
     (exp / "outputs").mkdir()
     (exp / "logs").mkdir()
@@ -74,7 +74,7 @@ def write_experiment(
         "id": exp_id,
         "title": exp_id.title(),
         "status": "running",
-        "branch": "agents/{0}".format(exp_id),
+        "branch": "forkroom/{0}".format(exp_id),
     }
     if updated_at:
         manifest["updated_at"] = updated_at

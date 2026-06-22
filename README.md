@@ -34,7 +34,7 @@ forkroom init \
   --status running
 ```
 
-This creates `.agents/exps/my-experiment/worktree`, an `agents/my-experiment` branch, and a manifest that keeps the experiment together. Omit `--thread-id` if your current agent does not provide one.
+This creates `.forkroom/exps/my-experiment/worktree`, a `forkroom/my-experiment` branch, and a manifest that keeps the experiment together. Omit `--thread-id` if your current agent does not provide one.
 
 ### Continue an experiment in another session
 
@@ -51,7 +51,7 @@ forkroom record-session \
   --status running
 ```
 
-Continue the work inside `.agents/exps/my-experiment/worktree`.
+Continue the work inside `.forkroom/exps/my-experiment/worktree`.
 
 ### Merge an experiment
 
@@ -66,7 +66,7 @@ git commit -m "feat: describe the change [ForkRoom: my-experiment]"
 git push
 ```
 
-The experiment should also get a `.agents/exps/my-experiment/handoff.md` file with the commit ID, merged files, and any follow-up notes.
+The experiment should also get a `.forkroom/exps/my-experiment/handoff.md` file with the commit ID, merged files, and any follow-up notes.
 
 ## Contribute
 

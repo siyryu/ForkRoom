@@ -60,5 +60,5 @@ def update_forkroom_run(run_file: str, status: str, completed: Optional[int], to
 Call it from a loop:
 
 ```python
-update_forkroom_run(".agents/exps/<exp-id>/runs/<run-id>.json", "running", 450, 1000, "Processed 450/1000 rows", "2026-06-22T18:30:00+08:00")
+update_forkroom_run(".forkroom/exps/<exp-id>/runs/<run-id>.json", "running", 450, 1000, "Processed 450/1000 rows", "2026-06-22T18:30:00+08:00")
 ```

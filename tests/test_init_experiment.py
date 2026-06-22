@@ -56,11 +56,11 @@ def test_cli_initializes_experiment_and_records_session(tmp_path: Path, capsys: 
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
-    assert payload["branch"] == "agents/alpha-exp"
+    assert payload["branch"] == "forkroom/alpha-exp"
     assert payload["session"] == {"recorded": True, "thread_id": "thread-1"}
     assert [step["name"] for step in payload["steps"]][-1] == "final-validation"
 
-    exp_path = root / ".agents" / "exps" / "alpha-exp"
+    exp_path = root / ".forkroom" / "exps" / "alpha-exp"
     worktree_path = exp_path / "worktree"
     manifest = json.loads((exp_path / "manifest.json").read_text(encoding="utf-8"))
 
@@ -78,7 +78,7 @@ def test_cli_initializes_experiment_and_records_session(tmp_path: Path, capsys: 
     link_path = worktree_path / ".local" / "local-config.txt"
     assert link_path.is_symlink()
     assert os.readlink(link_path) == str((root / "local-config.txt").resolve())
-    assert branch_exists(root, "agents/alpha-exp")
+    assert branch_exists(root, "forkroom/alpha-exp")
     assert str(worktree_path) in git(root, "worktree", "list", "--porcelain").stdout
 
 
@@ -116,12 +116,12 @@ def test_optional_mapping_source_missing_is_reported_without_failing(tmp_path: P
             "target": ".env.local",
         }
     ]
-    assert not os.path.lexists(str(root / ".agents" / "exps" / "optional-map" / "worktree" / ".env.local"))
+    assert not os.path.lexists(str(root / ".forkroom" / "exps" / "optional-map" / "worktree" / ".env.local"))
 
 
 def test_rejects_existing_branch_conflict_before_creating_directories(tmp_path: Path) -> None:
     root = init_repo(tmp_path)
-    git(root, "branch", "agents/conflict-exp", "HEAD")
+    git(root, "branch", "forkroom/conflict-exp", "HEAD")
 
     with pytest.raises(InitExperimentError) as raised:
         init_experiment(
@@ -134,7 +134,7 @@ def test_rejects_existing_branch_conflict_before_creating_directories(tmp_path: 
 
     assert raised.value.code == "branch_exists"
     assert raised.value.step == "branch"
-    assert not (root / ".agents" / "exps" / "conflict-exp").exists()
+    assert not (root / ".forkroom" / "exps" / "conflict-exp").exists()
 
 
 @pytest.mark.parametrize(
@@ -187,4 +187,4 @@ def test_rejects_required_mapping_source_missing(tmp_path: Path) -> None:
 
     assert raised.value.code == "required_source_missing"
     assert raised.value.step == "worktree-map"
-    assert not branch_exists(root, "agents/missing-required-map")
+    assert not branch_exists(root, "forkroom/missing-required-map")

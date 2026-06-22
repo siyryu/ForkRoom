@@ -47,7 +47,7 @@ def test_cli_run_lifecycle_writes_events_and_updates_manifest(tmp_path: Path, ca
 
     assert exit_code == 0
     assert json.loads(capsys.readouterr().out)["ok"] is True
-    run_path = root / ".agents" / "exps" / "alpha" / "runs" / "train-model.json"
+    run_path = root / ".forkroom" / "exps" / "alpha" / "runs" / "train-model.json"
     run = json.loads(run_path.read_text(encoding="utf-8"))
     assert run["status"] == "running"
     assert run["session_id"] == "session-1"
@@ -105,7 +105,7 @@ def test_cli_run_lifecycle_writes_events_and_updates_manifest(tmp_path: Path, ca
 
     assert exit_code == 0
     run = json.loads(run_path.read_text(encoding="utf-8"))
-    manifest = json.loads((root / ".agents" / "exps" / "alpha" / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads((root / ".forkroom" / "exps" / "alpha" / "manifest.json").read_text(encoding="utf-8"))
     assert run["status"] == "succeeded"
     assert run["completed"] == 100
     assert run["total"] == 100
@@ -277,8 +277,8 @@ def start_run(root: Path, exp_id: str, run_id: str, session_id: str) -> int:
 
 
 def write_experiment(root: Path, exp_id: str) -> None:
-    git(root, "branch", "agents/{0}".format(exp_id), "HEAD")
-    exp_path = root / ".agents" / "exps" / exp_id
+    git(root, "branch", "forkroom/{0}".format(exp_id), "HEAD")
+    exp_path = root / ".forkroom" / "exps" / exp_id
     (exp_path / "worktree").mkdir(parents=True)
     (exp_path / "outputs").mkdir()
     (exp_path / "logs").mkdir()
@@ -287,7 +287,7 @@ def write_experiment(root: Path, exp_id: str) -> None:
             {
                 "id": exp_id,
                 "title": exp_id.title(),
-                "branch": "agents/{0}".format(exp_id),
+                "branch": "forkroom/{0}".format(exp_id),
                 "updated_at": FIXED_TIME,
             }
         ),
@@ -296,7 +296,7 @@ def write_experiment(root: Path, exp_id: str) -> None:
 
 
 def write_run(root: Path, exp_id: str, run_id: str, payload: dict) -> None:
-    path = root / ".agents" / "exps" / exp_id / "runs"
+    path = root / ".forkroom" / "exps" / exp_id / "runs"
     path.mkdir(parents=True, exist_ok=True)
     (path / "{0}.json".format(run_id)).write_text(json.dumps(payload), encoding="utf-8")
 

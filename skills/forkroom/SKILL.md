@@ -11,8 +11,8 @@ This is the central routing and guardrail skill for ForkRoom experiments. ForkRo
 
 When you are operating on a task that belongs to an experiment (e.g., you are working on an issue and have created an experiment for it):
 
-1. **Default Context**: Treat `.agents/exps/<exp-id>/worktree` as your default repository root. Browsing, editing, testing, and git commands should happen **inside this directory**.
-2. **Main Worktree is Read-Only**: Use files in the main worktree (outside `.agents/exps/`) only as read-only context. 
+1. **Default Context**: Treat `.forkroom/exps/<exp-id>/worktree` as your default repository root. Browsing, editing, testing, and git commands should happen **inside this directory**.
+2. **Main Worktree is Read-Only**: Use files in the main worktree (outside `.forkroom/exps/`) only as read-only context.
 3. **No Unprompted Main Edits**: Require explicit user confirmation before making ANY modification to the main worktree. This includes direct file edits, package-manager lockfile changes, formatting, or git operations.
 4. **Symlinks & Secrets**: Never read, print, or commit local secret files (e.g., `.env`, `.pem`). Worktree mapping (handled in `init`) uses absolute symlinks to share these safely.
 
@@ -21,7 +21,7 @@ When you are operating on a task that belongs to an experiment (e.g., you are wo
 Every experiment follows this structure:
 
 ```text
-.agents/exps/<exp-id>/
+.forkroom/exps/<exp-id>/
   manifest.json
   worktree/      <-- All code changes happen here
   outputs/

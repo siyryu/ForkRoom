@@ -52,7 +52,7 @@ class AppRunTests(unittest.IsolatedAsyncioTestCase):
 
 
 def write_experiment_with_run(root: Path) -> None:
-    exp = root / ".agents" / "exps" / "demo"
+    exp = root / ".forkroom" / "exps" / "demo"
     (exp / "worktree").mkdir(parents=True)
     (exp / "outputs").mkdir()
     (exp / "logs").mkdir()
@@ -63,7 +63,7 @@ def write_experiment_with_run(root: Path) -> None:
                 "id": "demo",
                 "title": "Demo",
                 "status": "running",
-                "branch": "agents/demo",
+                "branch": "forkroom/demo",
                 "updated_at": "2026-06-15T10:00:00+08:00",
             }
         ),

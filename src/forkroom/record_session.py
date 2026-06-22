@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 from urllib.parse import quote
 
 
-EXPS_DIR = Path(".agents") / "exps"
+EXPS_DIR = Path(".forkroom") / "exps"
 
 
 class RecordSessionError(Exception):
@@ -22,10 +22,10 @@ class RecordSessionError(Exception):
 def build_parser(prog: Optional[str] = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=prog,
-        description="Record a Codex session in .agents/exps/<exp-id>/manifest.json.",
+        description="Record a Codex session in .forkroom/exps/<exp-id>/manifest.json.",
     )
     parser.add_argument("--root", default=".", help="Repository root. Defaults to the current directory.")
-    parser.add_argument("--exp", required=True, help="Experiment id under .agents/exps.")
+    parser.add_argument("--exp", required=True, help="Experiment id under .forkroom/exps.")
     parser.add_argument("--thread-id", required=True, help="Codex thread/session id.")
     parser.add_argument("--title", default="", help="Human-readable session title.")
     parser.add_argument("--agent", default="codex", help="Session agent name. Defaults to codex.")

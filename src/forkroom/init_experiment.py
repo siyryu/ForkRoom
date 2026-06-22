@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from .record_session import RecordSessionError, record_session
 
 
-EXPS_DIR = Path(".agents") / "exps"
+EXPS_DIR = Path(".forkroom") / "exps"
 MAP_PATH = Path(".forkroom") / "worktree-map.json"
 ALLOWED_STATUSES = {"draft", "running", "ready", "handoff", "merged", "archived"}
 EXP_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
@@ -79,7 +79,7 @@ class MapPlan:
 def build_parser(prog: Optional[str] = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=prog,
-        description="Initialize .agents/exps/<id> with a branch, worktree, manifest, and local symlinks.",
+        description="Initialize .forkroom/exps/<id> with a branch, worktree, manifest, and local symlinks.",
     )
     parser.add_argument("--root", default=".", help="Repository root. Defaults to the current directory.")
     parser.add_argument("--id", default="", help="Lowercase hyphenated experiment id.")
@@ -144,7 +144,7 @@ def init_experiment(
     repo_step(root, steps)
     git_status_step(root, steps, warnings)
 
-    branch = "agents/{0}".format(exp_id)
+    branch = "forkroom/{0}".format(exp_id)
     exps_path = root / EXPS_DIR
     exp_path = safe_child(exps_path, exp_id, "experiment", "directories", steps)
     outputs_path = exp_path / "outputs"

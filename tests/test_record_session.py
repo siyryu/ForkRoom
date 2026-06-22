@@ -147,7 +147,7 @@ class RecordSessionTest(unittest.TestCase):
         self.assertEqual(codex_thread_deeplink("thread with spaces"), "codex://threads/thread%20with%20spaces")
 
     def write_manifest(self, root: Path, exp_id: str, manifest: dict) -> Path:
-        exp_path = root / ".agents" / "exps" / exp_id
+        exp_path = root / ".forkroom" / "exps" / exp_id
         exp_path.mkdir(parents=True)
         manifest_path = exp_path / "manifest.json"
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
