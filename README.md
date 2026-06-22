@@ -17,56 +17,35 @@ This installs the `forkroom` CLI and the ForkRoom skills for the current project
 
 ## Usage
 
-Use ForkRoom from the repository root where you want experiments to live.
+Open the repo where you want to start coding, then use the `@forkroom` skill and ask it to help you start your first experiment.
+
+![ForkRoom experiment lifecycle](docs/assets/forkroom-lifecycle.png)
+
+### Concepts
+
+| Concept | What it means | Where it lives |
+| --- | --- | --- |
+| Exp (Experiment) | One isolated attempt to explore a coding idea. It owns the branch, worktree, manifest, outputs, logs, sessions, and runs for that trial. | `.forkroom/exps/<exp-id>/` |
+| Session | One agent conversation or thread working on an experiment. Multiple sessions can attach to the same experiment. | `sessions[]` in `.forkroom/exps/<exp-id>/manifest.json` |
+| Run | One tracked long-running task inside a session, with status, progress counts, messages, ETA, and events. A session can have only one active run at a time. | `.forkroom/exps/<exp-id>/runs/<run-id>.json` |
 
 ### Create an experiment
 
-Ask your coding agent to create a ForkRoom experiment, or run:
+Ask your coding agent to use `@forkroom` to create a ForkRoom experiment for the coding task you want to explore.
 
-```bash
-forkroom init \
-  --root . \
-  --id my-experiment \
-  --title "My Experiment" \
-  --summary "Explore a focused change in an isolated workspace." \
-  --session-title "Initial session" \
-  --thread-id "$CODEX_THREAD_ID" \
-  --status running
-```
-
-This creates `.forkroom/exps/my-experiment/worktree`, a `forkroom/my-experiment` branch, and a manifest that keeps the experiment together. Omit `--thread-id` if your current agent does not provide one.
+The skill creates `.forkroom/exps/my-experiment/worktree`, a `forkroom/my-experiment` branch, and a manifest that keeps the experiment together.
 
 ### Continue an experiment in another session
 
-Run `forkroom`, highlight the experiment, press `c` to copy its info, then paste it into a new agent session and ask it to continue that experiment.
+From the ForkRoom interface, copy the experiment info into a new agent session and ask that agent to continue the experiment with `@forkroom`.
 
-You can also bind the new session manually:
-
-```bash
-forkroom record-session \
-  --root . \
-  --exp my-experiment \
-  --thread-id "$CODEX_THREAD_ID" \
-  --title "Continue my experiment" \
-  --status running
-```
-
-Continue the work inside `.forkroom/exps/my-experiment/worktree`.
+The skill binds the new session to the existing experiment, then keeps work inside `.forkroom/exps/my-experiment/worktree`.
 
 ### Merge an experiment
 
-When an experiment is ready, ask your coding agent to merge experiment `my-experiment` back to `main`, commit it, and push.
+When an experiment is ready, ask your coding agent to use `@forkroom` to merge experiment `my-experiment` back to `main`.
 
-ForkRoom's merge flow selectively ports the finished code into the main worktree instead of blindly merging the experiment branch. The final steps should look like:
-
-```bash
-git switch main
-git add <merged-files>
-git commit -m "feat: describe the change [ForkRoom: my-experiment]"
-git push
-```
-
-The experiment should also get a `.forkroom/exps/my-experiment/handoff.md` file with the commit ID, merged files, and any follow-up notes.
+ForkRoom's merge flow selectively ports the finished code into the main worktree instead of blindly merging the experiment branch. The experiment also gets a `.forkroom/exps/my-experiment/handoff.md` file with the commit ID, merged files, and any follow-up notes.
 
 ## Contribute
 
