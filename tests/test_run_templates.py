@@ -2,9 +2,9 @@ from pathlib import Path
 
 
 def test_run_skill_templates_exist_and_require_eta() -> None:
-    templates = Path("skills/forkroom-run/templates")
+    templates = Path("skills/forkroom/references")
 
-    for name in ("shell.md", "python.md", "node.md"):
+    for name in ("run-template-shell.md", "run-template-python.md", "run-template-node.md"):
         text = (templates / name).read_text(encoding="utf-8")
         assert "estimated_end_at" in text
         assert "completed" in text
@@ -14,7 +14,7 @@ def test_run_skill_templates_exist_and_require_eta() -> None:
 
 
 def test_run_skill_explains_session_uniqueness() -> None:
-    text = Path("skills/forkroom-run.md").read_text(encoding="utf-8")
+    text = Path("skills/forkroom/references/run.md").read_text(encoding="utf-8")
 
     assert "only one active run" in text
     assert "must not create runs" in text

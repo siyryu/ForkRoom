@@ -12,6 +12,7 @@ def test_install_copies_forkroom_skills_without_touching_other_skills(tmp_path: 
     skills_dir.mkdir(parents=True)
     (skills_dir / "custom.md").write_text("keep me\n", encoding="utf-8")
     (skills_dir / "forkroom-init.md").write_text("old\n", encoding="utf-8")
+    (skills_dir / "forkroom-run").mkdir()
 
     result = install.install_forkroom(
         root=root,
@@ -21,10 +22,12 @@ def test_install_copies_forkroom_skills_without_touching_other_skills(tmp_path: 
     )
 
     assert result.tool_installed is False
-    assert sorted(result.installed_entries) == ["forkroom", "forkroom-init.md", "forkroom-run.md"]
+    assert sorted(result.installed_entries) == ["forkroom"]
     assert (skills_dir / "custom.md").read_text(encoding="utf-8") == "keep me\n"
-    assert (skills_dir / "forkroom-init.md").read_text(encoding="utf-8") == "new init\n"
+    assert not (skills_dir / "forkroom-init.md").exists()
+    assert not (skills_dir / "forkroom-run").exists()
     assert (skills_dir / "forkroom" / "SKILL.md").read_text(encoding="utf-8") == "new skill\n"
+    assert (skills_dir / "forkroom" / "references" / "init.md").read_text(encoding="utf-8") == "new init\n"
 
 
 def test_install_links_skills_from_local_source(tmp_path: Path) -> None:
@@ -40,8 +43,6 @@ def test_install_links_skills_from_local_source(tmp_path: Path) -> None:
     )
 
     skills_dir = root / ".codex" / "skills"
-    assert (skills_dir / "forkroom-init.md").is_symlink()
-    assert (skills_dir / "forkroom-init.md").resolve() == (source / "skills" / "forkroom-init.md").resolve()
     assert (skills_dir / "forkroom").is_symlink()
     assert (skills_dir / "forkroom").resolve() == (source / "skills" / "forkroom").resolve()
 
@@ -93,8 +94,8 @@ def test_install_runs_uv_tool_install_by_default(tmp_path: Path) -> None:
 def make_source(tmp_path: Path) -> Path:
     source = tmp_path / "forkroom-source"
     skills = source / "skills"
-    (skills / "forkroom").mkdir(parents=True)
-    (skills / "forkroom-init.md").write_text("new init\n", encoding="utf-8")
-    (skills / "forkroom-run.md").write_text("new run\n", encoding="utf-8")
+    (skills / "forkroom" / "references").mkdir(parents=True)
     (skills / "forkroom" / "SKILL.md").write_text("new skill\n", encoding="utf-8")
+    (skills / "forkroom" / "references" / "init.md").write_text("new init\n", encoding="utf-8")
+    (skills / "forkroom" / "references" / "run.md").write_text("new run\n", encoding="utf-8")
     return source

@@ -1,11 +1,6 @@
----
-name: forkroom:init
-description: Create a new ForkRoom experiment worktree and automatically map local unindexed files (like .env) to the isolated environment.
----
-
 # ForkRoom: Initialize Experiment
 
-Use this skill to create a new coding experiment isolated from the main worktree and set up its local environment mapping automatically.
+Use this reference to create a new coding experiment isolated from the main worktree and set up its local environment mapping automatically.
 
 ## 1. Setup the Experiment
 1. Extract or derive a lowercase hyphenated `<exp-id>`, a title, a one-sentence summary, and a session title from the user's request.

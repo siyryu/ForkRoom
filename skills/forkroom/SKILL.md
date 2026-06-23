@@ -1,22 +1,24 @@
 ---
 name: forkroom
-description: Main entry point and global guardrails for ForkRoom coding experiments. Use this to understand the experiment layout, strict worktree isolation rules, and available sub-commands (init, record, merge).
+description: Main layered entry point and global guardrails for ForkRoom coding experiments. Use when starting an experiment, binding a session to an existing experiment, tracking a long-running run, or selectively merging an experiment back into the main worktree.
 ---
 
-# ForkRoom: Global Guardrails & Overview
+# ForkRoom
 
-This is the central routing and guardrail skill for ForkRoom experiments. ForkRoom manages coding experiments backed by Git worktrees to keep experimental agent work isolated from the main repository.
+Use this as the single entry point for ForkRoom experiments. Load the relevant reference file for the user's requested action, then follow that subworkflow.
 
-## 🚦 Strict Worktree Context Guardrails (CRITICAL)
+ForkRoom manages coding experiments backed by Git worktrees to keep experimental agent work isolated from the main repository.
+
+## Strict Worktree Guardrails
 
 When you are operating on a task that belongs to an experiment (e.g., you are working on an issue and have created an experiment for it):
 
-1. **Default Context**: Treat `.forkroom/exps/<exp-id>/worktree` as your default repository root. Browsing, editing, testing, and git commands should happen **inside this directory**.
-2. **Main Worktree is Read-Only**: Use files in the main worktree (outside `.forkroom/exps/`) only as read-only context.
-3. **No Unprompted Main Edits**: Require explicit user confirmation before making ANY modification to the main worktree. This includes direct file edits, package-manager lockfile changes, formatting, or git operations.
-4. **Symlinks & Secrets**: Never read, print, or commit local secret files (e.g., `.env`, `.pem`). Worktree mapping (handled in `init`) uses absolute symlinks to share these safely.
+1. Treat `.forkroom/exps/<exp-id>/worktree` as the default repository root. Browse, edit, test, and run git commands inside this directory.
+2. Use the main worktree outside `.forkroom/exps/` as read-only context unless the merge workflow explicitly says otherwise.
+3. Require explicit user confirmation before modifying the main worktree outside the merge workflow.
+4. Never read, print, or commit secret files such as `.env` or `*.pem`. Worktree mapping uses symlinks so local-only files can be shared without exposing contents.
 
-## 📂 Experiment Layout
+## Experiment Layout
 
 Every experiment follows this structure:
 
@@ -31,17 +33,17 @@ Every experiment follows this structure:
   handoff.md     <-- Generated during merge review
 ```
 
-## 🛠️ Available Sub-Commands
+## Routing
 
-Instead of executing the entire lifecycle manually, delegate tasks to the following specialized skills based on the user's request:
+Read exactly the reference needed for the task:
 
-*   **`forkroom-init`**
-    Use when starting a new experiment. It handles `forkroom init` to create the worktree, branch, and manifest, and automatically sets up local unindexed file symlinks (mapping).
-*   **`forkroom-record`**
-    Use when the user pastes text containing an experiment ID (usually copied via the TUI's 'c' shortcut) to quickly bind the current AI session to that experiment.
-*   **`forkroom-run`**
-    Use when a long-running task needs tracked progress, ETA updates, and strict lifecycle management. It handles `forkroom run` plus template-based progress updates inside temporary scaffolding.
-*   **`forkroom-merge`**
-    Use when an experiment is finished and needs to be merged back into the main repository. It uses a subagent to selectively port ONLY the core solution (discarding scaffolding), commits the changes, and generates a handoff document.
+- Start a new experiment: read `references/init.md`.
+- Bind the current session to an existing experiment: read `references/record.md`.
+- Track a long-running task with run status and ETA updates: read `references/run.md`.
+- Merge a finished experiment back into the main worktree: read `references/merge.md`.
 
-*(If the user's request matches one of these specific actions, directly invoke the corresponding skill.)*
+For run progress templates, read one of:
+
+- Shell scaffolding: `references/run-template-shell.md`.
+- Python scaffolding: `references/run-template-python.md`.
+- Node.js scaffolding: `references/run-template-node.md`.

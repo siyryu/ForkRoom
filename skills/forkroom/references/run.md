@@ -1,11 +1,6 @@
----
-name: forkroom:run
-description: Track a long-running ForkRoom run with strict lifecycle updates, ETA refreshes, and optional template-based progress writes.
----
-
 # ForkRoom: Track a Run
 
-Use this skill when a task will take long enough that the user benefits from progress, status, and ETA updates. Examples include package installation, model training, plan execution, migrations, crawlers, test sweeps, or any loop that produces incremental progress.
+Use this reference when a task will take long enough that the user benefits from progress, status, and ETA updates. Examples include package installation, model training, plan execution, migrations, crawlers, test sweeps, or any loop that produces incremental progress.
 
 ## Default Flow
 
@@ -50,10 +45,10 @@ Use this skill when a task will take long enough that the user benefits from pro
 
 ## Template Selection
 
-Use the templates in `skills/forkroom-run/templates/` when writing temporary scaffold code inside an experiment worktree:
+Use the templates in `skills/forkroom/references/` when writing temporary scaffold code inside an experiment worktree:
 
-- `shell.md` for shell scripts and installation loops.
-- `python.md` for training, ETL, crawling, or data-processing loops.
-- `node.md` for JavaScript/TypeScript scripts.
+- `run-template-shell.md` for shell scripts and installation loops.
+- `run-template-python.md` for training, ETL, crawling, or data-processing loops.
+- `run-template-node.md` for JavaScript/TypeScript scripts.
 
 Each template directly updates the existing run JSON file, appends an event, writes atomically, and preserves the lifecycle constraints above.

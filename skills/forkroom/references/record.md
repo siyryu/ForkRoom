@@ -1,11 +1,6 @@
----
-name: forkroom:record
-description: Bind the current AI session to an existing experiment. Triggered when the user pastes experiment info copied via the TUI 'c' shortcut.
----
-
 # ForkRoom: Record Session
 
-Use this skill when the user pastes experiment information (usually copied from the ForkRoom TUI using the `c` shortcut) and wants to associate the current AI conversation with that experiment.
+Use this reference when the user pastes experiment information (usually copied from the ForkRoom TUI using the `c` shortcut) and wants to associate the current AI conversation with that experiment.
 
 ## Steps
 
@@ -23,4 +18,4 @@ Use this skill when the user pastes experiment information (usually copied from 
    *(Use a concise title summarizing the current goal for `<session-title>` if not explicitly provided).*
 
 ## Output
-Keep the response extremely brief. E.g., "✅ Successfully bound current session to experiment `<exp-id>`." Do not explain the steps taken unless an error occurred.
+Keep the response extremely brief. For example: "Successfully bound current session to experiment `<exp-id>`." Do not explain the steps taken unless an error occurred.

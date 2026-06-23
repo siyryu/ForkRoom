@@ -14,6 +14,14 @@ DEFAULT_SOURCE = "git+https://github.com/siyryu/forkroom.git"
 
 Runner = Callable[..., subprocess.CompletedProcess]
 
+LEGACY_FORKROOM_SKILL_ENTRIES = (
+    "forkroom-init.md",
+    "forkroom-record.md",
+    "forkroom-run.md",
+    "forkroom-merge.md",
+    "forkroom-run",
+)
+
 
 class InstallError(Exception):
     """Raised when ForkRoom cannot be installed into a project."""
@@ -157,6 +165,11 @@ def git_clone_spec(source: str) -> tuple[str, Optional[str]]:
 def install_skills(source_skills: Path, target_skills: Path, *, link_skills: bool) -> Sequence[str]:
     target_skills.mkdir(parents=True, exist_ok=True)
     installed = []
+
+    for legacy_entry in LEGACY_FORKROOM_SKILL_ENTRIES:
+        target_entry = target_skills / legacy_entry
+        if target_entry.is_symlink() or target_entry.exists():
+            remove_existing(target_entry)
 
     for source_entry in sorted(source_skills.iterdir(), key=lambda path: path.name):
         if source_entry.name.startswith("."):
